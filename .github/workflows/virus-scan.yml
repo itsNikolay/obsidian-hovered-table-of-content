@@ -1,0 +1,54 @@
+name: VirusTotal release scan
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Published release tag to scan
+        required: true
+        default: '1.0.0'
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: virustotal-public-api
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Download exact published release files
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          [[ "$RELEASE_TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir release-files --pattern main.js --pattern manifest.json --pattern styles.css
+          node -e 'const m=require("./release-files/manifest.json"); if(m.version!==process.env.RELEASE_TAG) throw new Error("Release manifest version mismatch")'
+      - name: Scan downloaded release files
+        env:
+          VIRUSTOTAL_API_KEY: ${{ secrets.VIRUSTOTAL_API_KEY }}
+        run: npm run scan:virustotal -- release-files
+      - name: Preserve VirusTotal report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: virustotal-report
+          path: artifacts/virustotal/
+          if-no-files-found: warn
+      - name: Add report to run summary
+        if: always()
+        run: |
+          if [[ -f artifacts/virustotal/virustotal-report.md ]]; then
+            cat artifacts/virustotal/virustotal-report.md >> "$GITHUB_STEP_SUMMARY"
+          fi

@@ -1,0 +1,10 @@
+{
+	"id": "hovered-table-of-content",
+	"name": "Hovered Table of Content",
+	"version": "1.0.0",
+	"minAppVersion": "1.5.7",
+	"description": "Hover a T icon to see the note's table of contents, preview each section, and keep sticky headings at the top.",
+	"author": "itsNikolay",
+	"authorUrl": "https://github.com/itsNikolay",
+	"isDesktopOnly": false
+}

@@ -1,0 +1,199 @@
+/* Hovered Table of Content */
+
+.htoc-host {
+	position: relative;
+}
+
+/* The T icon: the note button, and the small inline icons in previews and sticky headings. */
+.htoc-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	box-sizing: border-box;
+	width: 16px;
+	height: 16px;
+	margin-inline-start: 4px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s);
+	background-color: var(--background-primary);
+	color: var(--text-muted);
+	font-family: var(--font-interface);
+	font-size: 10px;
+	font-weight: var(--font-bold);
+	line-height: 1;
+	vertical-align: middle;
+	cursor: pointer;
+	user-select: none;
+}
+
+.htoc-icon:hover {
+	border-color: var(--interactive-accent);
+	color: var(--text-accent);
+}
+
+.htoc-button {
+	position: absolute;
+	z-index: 3;
+	width: 26px;
+	height: 26px;
+	margin: 0;
+	border-radius: var(--radius-s);
+	font-size: 14px;
+	box-shadow: var(--shadow-s);
+	opacity: 0.75;
+}
+
+.htoc-button:hover {
+	opacity: 1;
+}
+
+.htoc-button[hidden] {
+	display: none;
+}
+
+/* Keep clear of the scrollbar on the right and the status bar at the bottom. */
+.htoc-pos-top-left { top: 12px; left: 12px; }
+.htoc-pos-top-center { top: 12px; left: 50%; transform: translateX(-50%); }
+.htoc-pos-top-right { top: 12px; right: 24px; }
+.htoc-pos-bottom-left { bottom: 32px; left: 12px; }
+.htoc-pos-bottom-center { bottom: 32px; left: 50%; transform: translateX(-50%); }
+.htoc-pos-bottom-right { bottom: 32px; right: 24px; }
+
+/* The T button in Obsidian page previews, left of the popover's own expand button. */
+.popover.hover-popover > .htoc-preview-button {
+	top: 8px;
+	right: 40px;
+	left: auto;
+	flex: none;
+	width: 26px;
+	min-width: 0;
+	max-width: none;
+	height: 26px;
+	padding: 0;
+}
+
+/* Popups */
+.htoc-popup {
+	position: fixed;
+	z-index: var(--layer-popover);
+	box-sizing: border-box;
+	overflow: auto;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	background-color: var(--background-primary);
+	box-shadow: var(--shadow-l);
+	font-size: var(--font-ui-small);
+}
+
+.htoc-toc {
+	min-width: 200px;
+	max-width: 360px;
+	max-height: 70vh;
+	padding: 6px;
+}
+
+.htoc-toc-title {
+	padding: 2px 8px 6px;
+	border-bottom: 1px solid var(--background-modifier-border);
+	margin-bottom: 4px;
+	color: var(--text-muted);
+	font-weight: var(--font-semibold);
+}
+
+.htoc-toc-empty {
+	padding: 4px 8px;
+	color: var(--text-faint);
+}
+
+.htoc-toc-item {
+	padding: 3px 8px 3px calc(8px + var(--htoc-depth, 0) * 14px);
+	border-radius: var(--radius-s);
+	color: var(--text-normal);
+	cursor: pointer;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.htoc-toc-item[data-depth="0"] {
+	font-weight: var(--font-semibold);
+}
+
+.htoc-toc-item:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+/* Section previews look like Obsidian's own page previews: same size, margins and font size. */
+.htoc-preview {
+	width: calc(var(--popover-width) + 2 * var(--border-width));
+	max-width: 80vw;
+	max-height: var(--popover-height);
+	padding: var(--file-margins);
+	font-size: var(--popover-font-size);
+}
+
+.htoc-preview-content > :first-child {
+	margin-top: 0;
+}
+
+.htoc-preview-content > :last-child {
+	margin-bottom: 0;
+}
+
+/* Sticky headings */
+.htoc-sticky {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 14px;
+	z-index: 2;
+	pointer-events: none;
+}
+
+.htoc-sticky.is-empty {
+	display: none;
+}
+
+.htoc-sticky-inner {
+	box-sizing: border-box;
+	max-width: var(--file-line-width);
+	margin-inline: auto;
+	padding: 4px 8px;
+	background-color: var(--background-primary);
+	border-bottom: 1px solid var(--background-modifier-border);
+	box-shadow: 0 6px 8px -8px var(--background-modifier-box-shadow);
+	pointer-events: auto;
+}
+
+.htoc-sticky-row {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding-inline-start: calc((var(--htoc-level, 1) - 1) * 10px);
+	font-weight: var(--font-semibold);
+	line-height: 1.6;
+}
+
+.htoc-sticky-row[data-level="1"] { --htoc-level: 1; font-size: 1.1em; }
+.htoc-sticky-row[data-level="2"] { --htoc-level: 2; font-size: 1.05em; }
+.htoc-sticky-row[data-level="3"] { --htoc-level: 3; }
+.htoc-sticky-row[data-level="4"] { --htoc-level: 4; }
+.htoc-sticky-row[data-level="5"] { --htoc-level: 5; }
+.htoc-sticky-row[data-level="6"] { --htoc-level: 6; }
+
+.htoc-sticky-level {
+	color: var(--text-faint);
+	font-size: var(--font-ui-smaller);
+	font-weight: normal;
+}
+
+.htoc-sticky-text {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.htoc-sticky-text:hover {
+	color: var(--text-accent);
+}

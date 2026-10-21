@@ -1,0 +1,41 @@
+{
+	"name": "obsidian-hovered-table-of-content",
+	"version": "1.0.0",
+	"description": "Hover a T icon to see a note's table of contents, preview sections, and keep sticky headings on screen.",
+	"main": "main.js",
+	"type": "module",
+	"private": true,
+	"scripts": {
+		"dev": "node esbuild.config.mjs",
+		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+		"typecheck": "tsc --noEmit",
+		"test": "vitest run",
+		"lint": "eslint .",
+		"check": "npm run lint && npm run typecheck && npm test && npm run build",
+		"docker:test": "node scripts/run-docker.mjs unit",
+		"docker:check": "node scripts/run-docker.mjs check",
+		"docker:demo": "node scripts/run-docker.mjs demo",
+		"version": "node version-bump.mjs && git add manifest.json versions.json"
+	},
+	"keywords": [],
+	"license": "0-BSD",
+	"devDependencies": {
+		"@codemirror/language": "6.12.4",
+		"@eslint/js": "9.39.4",
+		"@types/node": "22.15.17",
+		"esbuild": "0.27.4",
+		"eslint": "9.39.4",
+		"eslint-plugin-obsidianmd": "0.4.2",
+		"globals": "17.6.0",
+		"jiti": "2.6.1",
+		"jsdom": "30.1.3",
+		"obsidian": "1.14.4",
+		"playwright": "1.64.0",
+		"typescript": "5.9.3",
+		"typescript-eslint": "8.72.0",
+		"vitest": "5.0.5"
+	},
+	"engines": {
+		"node": ">=22.13.0"
+	}
+}

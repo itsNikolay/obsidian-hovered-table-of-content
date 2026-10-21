@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="324" height="64" viewBox="0 0 324 64" role="img" aria-labelledby="title desc">
+  <title id="title">Add to Obsidian</title>
+  <desc id="desc">Open the Hovered Table of Content installation page in the official Obsidian plugin directory.</desc>
+  <defs>
+    <linearGradient id="surface" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7253d6"/>
+      <stop offset="1" stop-color="#49308e"/>
+    </linearGradient>
+  </defs>
+  <rect x=".5" y=".5" width="323" height="63" rx="13" fill="url(#surface)" stroke="#a78bea"/>
+  <rect x="14" y="14" width="36" height="36" rx="10" fill="#fff" fill-opacity=".12"/>
+  <g fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="20" y="20" width="24" height="24" rx="4"/>
+    <path d="M26 26h12M32 26v12"/>
+    <path d="M296 27l5 5-5 5m-6-5h11"/>
+  </g>
+  <text x="63" y="30" fill="#fff" font-family="Arial, sans-serif" font-size="18" font-weight="700">Add to Obsidian</text>
+  <text x="63" y="47" fill="#e5dcff" font-family="Arial, sans-serif" font-size="11">Hovered Table of Content · Install plugin</text>
+</svg>

@@ -4,9 +4,13 @@
 
 [![Latest release](https://img.shields.io/github/v/release/itsNikolay/obsidian-hovered-table-of-content?label=release)](https://github.com/itsNikolay/obsidian-hovered-table-of-content/releases/latest)
 [![CI](https://github.com/itsNikolay/obsidian-hovered-table-of-content/actions/workflows/ci.yml/badge.svg)](https://github.com/itsNikolay/obsidian-hovered-table-of-content/actions/workflows/ci.yml)
-[![License: 0BSD](https://img.shields.io/badge/license-0BSD-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 An **Obsidian plugin** that keeps a note's **table of contents (TOC)** one hover away. Hover a small **T** icon to see the note's outline, **preview any section** without scrolling, peek into the outline of **linked notes**, and keep **sticky headings** pinned at the top while you read long Markdown notes.
+
+[![Add to Obsidian — install Hovered Table of Content](docs/add-to-obsidian.svg)](https://community.obsidian.md/plugins/hovered-table-of-content)
+
+The button opens the official plugin installation page. Choose **Add to Obsidian**, then **Install** and **Enable** in the app.
 
 **Hovered Table of Content** is the plugin name. "Obsidian" describes the platform it extends; this is an independent project and is not affiliated with or endorsed by Obsidian.
 
@@ -27,15 +31,19 @@ It works in Reading view, Live Preview and Source mode, with light and dark them
 
 ## Installation
 
-The plugin is not yet listed in Obsidian's Community plugins. Until it is, install it in one of these ways.
+### From the community directory
 
-**With BRAT**
+[![Add to Obsidian — open the plugin installation page](docs/add-to-obsidian.svg)](https://community.obsidian.md/plugins/hovered-table-of-content)
+
+Open the [Hovered Table of Content listing](https://community.obsidian.md/plugins/hovered-table-of-content) and choose **Add to Obsidian**, then install and enable the plugin. If your app does not find the newly published listing yet, use BRAT or the manual installation below.
+
+### With BRAT
 
 1. Install and enable [BRAT](https://github.com/TfTHacker/obsidian42-brat) from Community plugins.
 2. Run **BRAT: Add a beta plugin for testing** and enter `itsNikolay/obsidian-hovered-table-of-content`.
 3. Enable **Hovered Table of Content** in **Settings → Community plugins**.
 
-**Manually**
+### Manually
 
 1. Download `main.js`, `manifest.json` and `styles.css` from the [latest release](https://github.com/itsNikolay/obsidian-hovered-table-of-content/releases/latest).
 2. Copy them to `<your vault>/.obsidian/plugins/hovered-table-of-content/`.

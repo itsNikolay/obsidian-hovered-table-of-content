@@ -1,8 +1,20 @@
-# Hovered Table of Content
+# Hovered Table of Content — Obsidian table of contents plugin
 
 ![Hovering the T icon shows the table of contents, section previews, linked notes, the T on links in a note and sticky headings](docs/demo.gif)
 
-An Obsidian plugin that keeps a note's structure one hover away.
+[![Latest release](https://img.shields.io/github/v/release/itsNikolay/obsidian-hovered-table-of-content?label=release)](https://github.com/itsNikolay/obsidian-hovered-table-of-content/releases/latest)
+[![CI](https://github.com/itsNikolay/obsidian-hovered-table-of-content/actions/workflows/ci.yml/badge.svg)](https://github.com/itsNikolay/obsidian-hovered-table-of-content/actions/workflows/ci.yml)
+[![License: 0BSD](https://img.shields.io/badge/license-0BSD-blue.svg)](LICENSE)
+
+An **Obsidian plugin** that keeps a note's **table of contents (TOC)** one hover away. Hover a small **T** icon to see the note's outline, **preview any section** without scrolling, peek into the outline of **linked notes**, and keep **sticky headings** pinned at the top while you read long Markdown notes.
+
+**Hovered Table of Content** is the plugin name. "Obsidian" describes the platform it extends; this is an independent project and is not affiliated with or endorsed by Obsidian.
+
+## Table of contents in Obsidian without a sidebar
+
+Obsidian's core Outline view lives in a sidebar and only shows the active note. Hovered Table of Content puts a **floating table of contents** inside every note, page preview and link, so you can navigate long notes, documentation, meeting notes and Zettelkasten links without opening panels or inserting a TOC block into your Markdown. It never edits your notes.
+
+## Features
 
 - **T icon.** Every note gets a small square **T** button. Hover over it to see the note's table of contents in a popup.
 - **Section previews.** Hover over a heading in the table of contents to preview that section: the heading, its text and its subsections. Click the heading to jump to it (Ctrl/Cmd-click opens it in a new tab).
@@ -11,7 +23,25 @@ An Obsidian plugin that keeps a note's structure one hover away.
 - **T in page previews.** Obsidian's page previews of notes get a **T** button too, with the table of contents of the previewed note.
 - **Sticky headings.** When you scroll past a heading, it stays pinned at the top of the note. Click it to jump back. Each sticky heading has a **T** icon that lists only that heading's subheadings.
 
-It works in Reading view, Live Preview and Source mode.
+It works in Reading view, Live Preview and Source mode, with light and dark themes.
+
+## Installation
+
+The plugin is not yet listed in Obsidian's Community plugins. Until it is, install it in one of these ways.
+
+**With BRAT**
+
+1. Install and enable [BRAT](https://github.com/TfTHacker/obsidian42-brat) from Community plugins.
+2. Run **BRAT: Add a beta plugin for testing** and enter `itsNikolay/obsidian-hovered-table-of-content`.
+3. Enable **Hovered Table of Content** in **Settings → Community plugins**.
+
+**Manually**
+
+1. Download `main.js`, `manifest.json` and `styles.css` from the [latest release](https://github.com/itsNikolay/obsidian-hovered-table-of-content/releases/latest).
+2. Copy them to `<your vault>/.obsidian/plugins/hovered-table-of-content/`.
+3. Reload Obsidian and enable **Hovered Table of Content** in **Settings → Community plugins**.
+
+Requires Obsidian 1.5.7 or later.
 
 ## Settings
 
@@ -25,6 +55,10 @@ It works in Reading view, Live Preview and Source mode.
 | Sticky heading mode | Heading with its parents | *Closest heading* shows only the last heading above the screen. *Heading with its parents* also shows its parent headings. |
 | Icons on sticky headings | On | Shows a **T** with the subheadings next to each sticky heading. |
 
+## Release security checks
+
+Every release is built by GitHub Actions from a tagged commit. Before publishing, the workflow runs the unit and end-to-end tests, scans `main.js`, `manifest.json` and `styles.css` with VirusTotal and blocks the release on any detection, and attests build provenance for the three files. The scan report with SHA-256 hashes is included in the release notes.
+
 ## Development
 
 The tests run in Docker, including end-to-end checks against the real Linux Obsidian app on a virtual display:
@@ -32,6 +66,7 @@ The tests run in Docker, including end-to-end checks against the real Linux Obsi
 ```sh
 npm run docker:test    # lint, typecheck, unit tests (vitest + jsdom), build
 npm run docker:check   # all of the above + end-to-end tests in real Obsidian
+npm run docker:e2e     # only the end-to-end tests in real Obsidian
 npm run docker:demo    # re-record docs/demo.gif in real Obsidian
 ```
 
@@ -50,5 +85,12 @@ Without Docker, use Node 22.13 or later: `npm ci && npm run check`.
 | `src/main.ts` | Plugin lifecycle and the link to the Obsidian API |
 | `scripts/test-obsidian-docker.mts` | End-to-end tests against real Obsidian |
 | `scripts/record-demo.mts` | Records the demo GIF at the top of this README |
+| `scripts/scan-virustotal.mts` | VirusTotal scan of the release files |
+
+## Releasing
+
+Bump the version with `npm version <patch|minor|major>` (updates `manifest.json` and `versions.json`), then push the commit and its tag: `git push --follow-tags`. The tag must equal the manifest version (for example `1.0.1`, without a `v`). The release workflow needs the `VIRUSTOTAL_API_KEY` repository secret.
+
+## Credits
 
 Based on [obsidian-sample-plugin](https://github.com/obsidianmd/obsidian-sample-plugin). The sticky-heading approach comes from [obsidian-sticky-heading](https://github.com/imshenshen/obsidian-sticky-heading), and the heading handling from [obsidian-automatic-table-of-contents](https://github.com/johansatge/obsidian-automatic-table-of-contents).

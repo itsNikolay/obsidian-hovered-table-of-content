@@ -1,7 +1,7 @@
 {
 	"name": "obsidian-hovered-table-of-content",
 	"version": "1.0.0",
-	"description": "Hover a T icon to see a note's table of contents, preview sections, and keep sticky headings on screen.",
+	"description": "Obsidian plugin: hover a T icon to see a note's table of contents, preview sections, and keep sticky headings on screen.",
 	"main": "main.js",
 	"type": "module",
 	"private": true,
@@ -14,11 +14,29 @@
 		"check": "npm run lint && npm run typecheck && npm test && npm run build",
 		"docker:test": "node scripts/run-docker.mjs unit",
 		"docker:check": "node scripts/run-docker.mjs check",
+		"docker:e2e": "node scripts/run-docker.mjs e2e",
 		"docker:demo": "node scripts/run-docker.mjs demo",
+		"scan:virustotal": "node --experimental-strip-types scripts/scan-virustotal.mts",
 		"version": "node version-bump.mjs && git add manifest.json versions.json"
 	},
-	"keywords": [],
+	"keywords": [
+		"obsidian",
+		"obsidian-plugin",
+		"obsidian-md",
+		"table-of-contents",
+		"toc",
+		"outline",
+		"sticky-headings",
+		"hover-preview",
+		"markdown",
+		"navigation"
+	],
 	"license": "0-BSD",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/itsNikolay/obsidian-hovered-table-of-content.git"
+	},
+	"homepage": "https://github.com/itsNikolay/obsidian-hovered-table-of-content#readme",
 	"devDependencies": {
 		"@codemirror/language": "6.12.4",
 		"@eslint/js": "9.39.4",

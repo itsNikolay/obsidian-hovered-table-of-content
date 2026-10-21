@@ -39,6 +39,12 @@ export default defineConfig(
 		rules: { 'obsidianmd/prefer-create-el': 'off' },
 	},
 	{
+		// The release scan test runs in Node, not in Obsidian.
+		files: ['tests/unit/virustotal.test.ts'],
+		languageOptions: { globals: { ...globals.node } },
+		rules: { 'obsidianmd/no-nodejs-modules': 'off' },
+	},
+	{
 		// minAppVersion predates the declarative settings API (1.13), so the tab keeps display().
 		files: ['src/settings-tab.ts'],
 		rules: {

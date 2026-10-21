@@ -10,6 +10,8 @@
 		"noUncheckedIndexedAccess": true,
 		"moduleResolution": "bundler",
 		"isolatedModules": true,
+		"allowImportingTsExtensions": true,
+		"noEmit": true,
 		"skipLibCheck": true,
 		"forceConsistentCasingInFileNames": true,
 		"allowSyntheticDefaultImports": true,

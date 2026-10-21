@@ -40,7 +40,8 @@ const PREVIEW_PLACEMENT: Placement = { side: 'right', align: 'start' };
 const isModEvent = (event: MouseEvent) => event.ctrlKey || event.metaKey;
 
 export function createIcon(doc: Document, className: string, label: string): HTMLElement {
-	const icon = doc.createElement('div');
+	const win = doc.win as typeof window;
+	const icon = win.createDiv();
 	icon.className = `htoc-icon ${className}`;
 	icon.textContent = 'T';
 	icon.setAttribute('aria-label', label);
@@ -69,23 +70,24 @@ export class TocController {
 
 	private renderToc(popup: Popup, source: TocSource): void {
 		const doc = popup.contentEl.ownerDocument;
-		const title = doc.createElement('div');
+		const win = doc.win as typeof window;
+		const title = win.createDiv();
 		title.className = 'htoc-toc-title';
 		title.textContent = source.title ?? this.host.getTitle(source.path);
 		popup.contentEl.append(title);
 
 		const headings = source.headings();
 		if (headings.length === 0) {
-			const empty = doc.createElement('div');
+			const empty = win.createDiv();
 			empty.className = 'htoc-toc-empty';
 			empty.textContent = 'No headings';
 			popup.contentEl.append(empty);
 			return;
 		}
-		const list = doc.createElement('div');
+		const list = win.createDiv();
 		list.className = 'htoc-toc-list';
 		for (const { heading, depth } of withDepth(headings)) {
-			const item = doc.createElement('div');
+			const item = win.createDiv();
 			item.className = 'htoc-toc-item';
 			item.dataset.depth = String(depth);
 			item.dataset.line = String(heading.line);
@@ -112,7 +114,7 @@ export class TocController {
 		const content = await this.host.readFile(path);
 		const markdown = extractSection(content, headings, Math.max(found, 0));
 
-		const container = popup.contentEl.ownerDocument.createElement('div');
+		const container = (popup.contentEl.ownerDocument.win as typeof window).createDiv();
 		container.className = 'htoc-preview-content markdown-rendered';
 		popup.contentEl.append(container);
 		const release = await this.host.renderMarkdown(markdown, container, path);

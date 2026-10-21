@@ -34,8 +34,8 @@ export default defineConfig(
 	},
 	...obsidianmd.configs.recommended,
 	{
-		// The UI modules build plain DOM so they run unchanged in the jsdom unit tests.
-		files: ['src/ui/**/*.ts', 'tests/**/*.ts'],
+		// Test fixtures and DOM helper stand-ins use native jsdom methods.
+		files: ['tests/**/*.ts'],
 		rules: { 'obsidianmd/prefer-create-el': 'off' },
 	},
 	{
@@ -43,13 +43,5 @@ export default defineConfig(
 		files: ['tests/unit/virustotal.test.ts'],
 		languageOptions: { globals: { ...globals.node } },
 		rules: { 'obsidianmd/no-nodejs-modules': 'off' },
-	},
-	{
-		// minAppVersion predates the declarative settings API (1.13), so the tab keeps display().
-		files: ['src/settings-tab.ts'],
-		rules: {
-			'obsidianmd/settings-tab/prefer-setting-definitions': 'off',
-			'@typescript-eslint/no-deprecated': 'off',
-		},
 	},
 );

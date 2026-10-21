@@ -32,10 +32,10 @@ export class Popup {
 		readonly parent: Popup | null,
 		private readonly options: PopupOptions,
 	) {
-		const doc = trigger.ownerDocument;
-		this.el = doc.createElement('div');
+		const win = trigger.ownerDocument.win as typeof window;
+		this.el = win.createDiv();
 		this.el.className = `htoc-popup ${options.className}`;
-		this.contentEl = doc.createElement('div');
+		this.contentEl = win.createDiv();
 		this.contentEl.className = 'htoc-popup-content';
 		this.el.append(this.contentEl);
 		this.el.addEventListener('mouseenter', () => {

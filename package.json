@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-hovered-table-of-content",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"description": "Obsidian plugin: hover a T icon to see a note's table of contents, preview sections, and keep sticky headings on screen.",
 	"main": "main.js",
 	"type": "module",
@@ -10,7 +10,7 @@
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
 		"typecheck": "tsc --noEmit",
 		"test": "vitest run",
-		"lint": "eslint .",
+		"lint": "eslint . --max-warnings 0",
 		"check": "npm run lint && npm run typecheck && npm test && npm run build",
 		"docker:test": "node scripts/run-docker.mjs unit",
 		"docker:check": "node scripts/run-docker.mjs check",
@@ -55,5 +55,9 @@
 	},
 	"engines": {
 		"node": ">=22.13.0"
+	},
+	"dependencies": {
+		"@codemirror/state": "6.7.6",
+		"@codemirror/view": "6.43.13"
 	}
 }

@@ -396,9 +396,16 @@ try {
 	await stickyToggle.click();
 	await page.waitForTimeout(300);
 	assert.equal(await page.locator('.workspace-leaf.mod-active .htoc-sticky').count(), 0, 'the toggle disables sticky headings');
+	assert.equal(await settingRow('Sticky heading mode').locator('select:not(.is-measuring)').isDisabled(), true, 'dependent settings are disabled');
 	await positionSelect.selectOption('bottom-left');
 	await page.waitForTimeout(300);
 	assert.match((await button.getAttribute('class')) ?? '', /htoc-pos-bottom-left/, 'the dropdown moves the icon');
+	const savedSettings = await page.evaluate(async () => (globalThis as any).app.plugins.plugins['hovered-table-of-content'].loadData());
+	assert.equal(savedSettings.buttonPosition, 'bottom-left', 'declarative dropdown persists');
+	assert.equal(savedSettings.stickyHeadings, false, 'declarative toggle persists');
+	await stickyToggle.click();
+	await page.waitForTimeout(300);
+	assert.equal(await settingRow('Sticky heading mode').locator('select:not(.is-measuring)').isDisabled(), false, 'dependent settings are enabled again');
 	await settingsPage.close();
 
 	assert.equal(errors.length, 0, errors.join('\n'));

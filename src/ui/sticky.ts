@@ -25,9 +25,8 @@ export class StickyHeadings {
 	private detachers: (() => void)[] = [];
 
 	constructor(private readonly options: StickyOptions) {
-		this.el = options.container.ownerDocument.createElement('div');
+		this.el = options.container.createDiv();
 		this.el.className = 'htoc-sticky is-empty';
-		options.container.append(this.el);
 	}
 
 	update(topLine: number): void {
@@ -49,18 +48,19 @@ export class StickyHeadings {
 	private render(sticky: Heading[]): void {
 		for (const detach of this.detachers.splice(0)) detach();
 		const doc = this.el.ownerDocument;
-		const inner = doc.createElement('div');
+		const win = doc.win as typeof window;
+		const inner = win.createDiv();
 		inner.className = 'htoc-sticky-inner';
 		const path = this.options.path();
 		for (const heading of sticky) {
-			const row = doc.createElement('div');
+			const row = win.createDiv();
 			row.className = 'htoc-sticky-row';
 			row.dataset.level = String(heading.level);
 
-			const level = doc.createElement('span');
+			const level = win.createSpan();
 			level.className = 'htoc-sticky-level';
 			level.textContent = `H${heading.level}`;
-			const text = doc.createElement('span');
+			const text = win.createSpan();
 			text.className = 'htoc-sticky-text';
 			text.textContent = getDisplayText(heading.heading);
 			text.addEventListener('click', () => this.options.onSelect(heading));

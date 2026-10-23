@@ -1,6 +1,6 @@
 // End-to-end checks against the real Linux Obsidian app inside Docker (see docker/entrypoint.sh).
 // Uses a synthetic, disposable vault; never touches the host Obsidian or a personal vault.
-import { chromium, type Browser, type Page } from 'playwright';
+import { chromium, type Browser, type Locator, type Page } from 'playwright';
 import type { ChildProcessByStdio } from 'node:child_process';
 import type { Readable } from 'node:stream';
 import { mkdir, writeFile, copyFile, readFile } from 'node:fs/promises';
@@ -68,6 +68,8 @@ async function scrollToLine(line: number) {
 }
 
 const stickyTexts = () => page!.locator('.workspace-leaf.mod-active .htoc-sticky-row .htoc-sticky-text').allTextContents();
+const numbersOf = (items: Locator) => items.evaluateAll((els) => els.map((el) => (el as HTMLElement).dataset.number ?? null));
+const stickyNumbers = () => numbersOf(page!.locator('.workspace-leaf.mod-active .htoc-sticky-row .htoc-sticky-text'));
 
 
 async function moveAway() {
@@ -132,6 +134,8 @@ try {
 	const toc = page.locator('.htoc-toc').first();
 	await toc.waitFor({ timeout: 3000 });
 	assert.deepEqual(await toc.locator('.htoc-toc-item').allTextContents(), ['Guide', 'Setup', 'Install', 'Configure', 'Usage', 'FAQ']);
+	assert.deepEqual(await numbersOf(toc.locator('.htoc-toc-item')), ['1.', '1.', '1.', '2.', '2.', '3.'], 'headings are numbered within their section by default');
+	assert.equal(await toc.locator('.htoc-toc-item').nth(3).evaluate((el) => getComputedStyle(el, '::before').content), '"2."', 'the number is shown before the heading');
 	await page.screenshot({ path: `${out}/toc-popover.png` });
 
 	step('hovering an item previews its section, links inside get their own T icon');
@@ -298,6 +302,7 @@ try {
 		await scrollToLine(lineOf('Install') + 6);
 		await page.waitForFunction(() => document.querySelectorAll('.workspace-leaf.mod-active .htoc-sticky-row').length > 0, null, { timeout: 3000 });
 		assert.deepEqual(await stickyTexts(), ['Guide', 'Setup', 'Install'], 'by default the heading comes with its parents');
+		assert.deepEqual(await stickyNumbers(), ['1.', '1.', '1.'], 'sticky headings are numbered');
 		if (mode === 'live') await page.screenshot({ path: `${out}/sticky-live.png` });
 	}
 
@@ -376,6 +381,32 @@ try {
 	}
 	await setMode('preview');
 
+	step('settings: the full heading number format, and no numbers');
+	await updateSettings({ numberFormat: 'full' });
+	await scrollToLine(lineOf('Configure') + 4);
+	await page.waitForFunction(() => document.querySelector('.workspace-leaf.mod-active .htoc-sticky-row:last-child .htoc-sticky-text')?.getAttribute('data-number') === '1.1.2.', null, { timeout: 3000 });
+	assert.deepEqual(await stickyNumbers(), ['1.', '1.1.', '1.1.2.']);
+	assert.equal(await page.locator('.workspace-leaf.mod-active .htoc-sticky-text').last().evaluate((el) => getComputedStyle(el, '::before').content), '"1.1.2."');
+	await button.hover();
+	await toc.waitFor({ timeout: 3000 });
+	assert.deepEqual(await numbersOf(toc.locator('.htoc-toc-item')), ['1.', '1.1.', '1.1.1.', '1.1.2.', '1.2.', '1.3.']);
+	await page.screenshot({ path: `${out}/numbers-full.png` });
+	await moveAway();
+	await page.locator('.workspace-leaf.mod-active .htoc-sticky-row').nth(1).locator('.htoc-sticky-toc').hover();
+	const subToc = page.locator('.htoc-toc').first();
+	await subToc.waitFor({ timeout: 3000 });
+	assert.deepEqual(await subToc.locator('.htoc-toc-item').allTextContents(), ['Install', 'Configure']);
+	assert.deepEqual(await numbersOf(subToc.locator('.htoc-toc-item')), ['1.1.1.', '1.1.2.'], 'subheadings keep their numbers in the note');
+	await moveAway();
+	await updateSettings({ headingNumbers: false });
+	await page.waitForTimeout(200);
+	assert.deepEqual(await stickyNumbers(), [null, null, null], 'no numbers on sticky headings');
+	await button.hover();
+	await toc.waitFor({ timeout: 3000 });
+	assert.deepEqual(await numbersOf(toc.locator('.htoc-toc-item')), [null, null, null, null, null, null], 'no numbers in the table of contents');
+	await moveAway();
+	await updateSettings({ headingNumbers: true, numberFormat: 'level' });
+
 	step('settings tab renders');
 	assert.equal(await page.evaluate(() => (globalThis as any).app.commands.executeCommandById('app:open-settings')), true);
 	// Obsidian 1.14 opens settings in their own window.
@@ -392,6 +423,10 @@ try {
 	assert.match((await stickyToggle.getAttribute('class')) ?? '', /is-enabled/, 'sticky headings are on by default');
 	for (const name of ['Icon in notes', 'Icons on links', 'Icons on links in notes', 'Icons on sticky headings'])
 		assert.match((await settingRow(name).locator('.checkbox-container').getAttribute('class')) ?? '', /is-enabled/, `${name} is on by default`);
+	assert.match((await settingRow('Heading numbers').locator('.checkbox-container').getAttribute('class')) ?? '', /is-enabled/, 'heading numbers are on by default');
+	const formatSelect = settingRow('Heading number format').locator('select:not(.is-measuring)');
+	assert.deepEqual(await formatSelect.locator('option').allTextContents(), ['Within the section: 1, 2', 'With the parents: 1.1, 1.2']);
+	assert.equal(await formatSelect.inputValue(), 'level');
 	await settingsPage.screenshot({ path: `${out}/settings.png` });
 	await stickyToggle.click();
 	await page.waitForTimeout(300);
@@ -406,6 +441,23 @@ try {
 	await stickyToggle.click();
 	await page.waitForTimeout(300);
 	assert.equal(await settingRow('Sticky heading mode').locator('select:not(.is-measuring)').isDisabled(), false, 'dependent settings are enabled again');
+	await formatSelect.selectOption('full');
+	await page.waitForTimeout(300);
+	await button.hover();
+	await toc.waitFor({ timeout: 3000 });
+	assert.deepEqual(await numbersOf(toc.locator('.htoc-toc-item')), ['1.', '1.1.', '1.1.1.', '1.1.2.', '1.2.', '1.3.'], 'the dropdown changes the number format');
+	await moveAway();
+	const numbersToggle = settingRow('Heading numbers').locator('.checkbox-container');
+	await numbersToggle.click();
+	await page.waitForTimeout(300);
+	assert.equal(await formatSelect.isDisabled(), true, 'the number format is disabled without numbers');
+	assert.deepEqual(await page.evaluate(async () => {
+		const saved = await (globalThis as any).app.plugins.plugins['hovered-table-of-content'].loadData();
+		return [saved.headingNumbers, saved.numberFormat];
+	}), [false, 'full'], 'the number settings persist');
+	await numbersToggle.click();
+	await page.waitForTimeout(300);
+	assert.equal(await formatSelect.isDisabled(), false, 'the number format is enabled again');
 	await settingsPage.close();
 
 	assert.equal(errors.length, 0, errors.join('\n'));

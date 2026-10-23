@@ -6,6 +6,9 @@ export type ButtonPosition = (typeof BUTTON_POSITIONS)[number];
 export const STICKY_MODES = ['prev', 'path'] as const;
 export type StickyMode = (typeof STICKY_MODES)[number];
 
+export const NUMBER_FORMATS = ['level', 'full'] as const;
+export type NumberFormat = (typeof NUMBER_FORMATS)[number];
+
 export interface HoveredTocSettings {
 	/** Where the T icon sits inside each note. */
 	buttonPosition: ButtonPosition;
@@ -21,6 +24,10 @@ export interface HoveredTocSettings {
 	noteLinkIcons: boolean;
 	/** T icons on sticky headings. */
 	stickyIcons: boolean;
+	/** Numbers before the headings in tables of contents and sticky headings. */
+	headingNumbers: boolean;
+	/** `level`: the number within its section (`2.`); `full`: with the numbers of its parents (`1.2.`). */
+	numberFormat: NumberFormat;
 }
 
 export const DEFAULT_SETTINGS: Readonly<HoveredTocSettings> = Object.freeze({
@@ -31,6 +38,8 @@ export const DEFAULT_SETTINGS: Readonly<HoveredTocSettings> = Object.freeze({
 	linkIcons: true,
 	noteLinkIcons: true,
 	stickyIcons: true,
+	headingNumbers: true,
+	numberFormat: 'level',
 });
 
 function isOneOf<T extends string>(values: readonly T[], value: unknown): value is T {
@@ -40,7 +49,7 @@ function isOneOf<T extends string>(values: readonly T[], value: unknown): value 
 /** Saved data merged over the defaults; unknown or malformed values fall back to the default. */
 export function normalizeSettings(raw: unknown): HoveredTocSettings {
 	const data = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
-	const flag = (key: 'stickyHeadings' | 'noteIcon' | 'linkIcons' | 'noteLinkIcons' | 'stickyIcons') =>
+	const flag = (key: 'stickyHeadings' | 'noteIcon' | 'linkIcons' | 'noteLinkIcons' | 'stickyIcons' | 'headingNumbers') =>
 		typeof data[key] === 'boolean' ? data[key] : DEFAULT_SETTINGS[key];
 	return {
 		buttonPosition: isOneOf(BUTTON_POSITIONS, data.buttonPosition) ? data.buttonPosition : DEFAULT_SETTINGS.buttonPosition,
@@ -50,7 +59,14 @@ export function normalizeSettings(raw: unknown): HoveredTocSettings {
 		linkIcons: flag('linkIcons'),
 		noteLinkIcons: flag('noteLinkIcons'),
 		stickyIcons: flag('stickyIcons'),
+		headingNumbers: flag('headingNumbers'),
+		numberFormat: isOneOf(NUMBER_FORMATS, data.numberFormat) ? data.numberFormat : DEFAULT_SETTINGS.numberFormat,
 	};
+}
+
+/** The format headings are numbered in, or null when numbering is off. */
+export function headingNumberFormat(settings: HoveredTocSettings): NumberFormat | null {
+	return settings.headingNumbers ? settings.numberFormat : null;
 }
 
 export function positionClass(position: ButtonPosition): string {

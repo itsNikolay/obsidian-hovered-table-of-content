@@ -1,4 +1,4 @@
-import type { StickyMode } from './settings';
+import type { NumberFormat, StickyMode } from './settings';
 
 /** A heading of a note; `line` is the zero-based line of the heading in the file. */
 export interface Heading {
@@ -19,6 +19,22 @@ export function withDepth(headings: Heading[]): { heading: Heading; depth: numbe
 		stack.push(heading.level);
 		return { heading, depth };
 	});
+}
+
+/**
+ * Number of every heading by its line, counted over the nesting of `withDepth`.
+ * `level` numbers a heading within its section (`2.`), `full` adds the numbers of its parents (`1.2.`).
+ */
+export function headingNumbers(headings: Heading[], format: NumberFormat): Map<number, string> {
+	const counters: number[] = [];
+	const numbers = new Map<number, string>();
+	for (const { heading, depth } of withDepth(headings)) {
+		// Depth grows by at most one per heading, so the counters stay without gaps.
+		counters.length = depth + 1;
+		counters[depth] = (counters[depth] ?? 0) + 1;
+		numbers.set(heading.line, `${format === 'full' ? counters.join('.') : counters[depth]}.`);
+	}
+	return numbers;
 }
 
 /** Index of the first heading after `index` that closes its section (same or higher level). */

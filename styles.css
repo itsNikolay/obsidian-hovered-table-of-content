@@ -123,6 +123,15 @@
 	background-color: var(--background-modifier-hover);
 }
 
+/* Heading numbers come from data-number, so the heading text itself stays unchanged. */
+.htoc-toc-item[data-number]::before,
+.htoc-sticky-text[data-number]::before {
+	content: attr(data-number);
+	margin-inline-end: 0.35em;
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
+}
+
 /* Section previews look like Obsidian's own page previews: same size, margins and font size. */
 .htoc-preview {
 	width: calc(var(--popover-width) + 2 * var(--border-width));

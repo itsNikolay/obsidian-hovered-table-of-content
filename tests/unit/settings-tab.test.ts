@@ -23,6 +23,13 @@ test('indexes every setting and keeps dependent controls discoverable', () => {
 	expect(mode?.disabled).toBeTypeOf('function');
 	plugin.settings.stickyHeadings = false;
 	if (typeof mode?.disabled === 'function') expect(mode.disabled()).toBe(true);
+	const format = controls.find((control) => control.key === 'numberFormat');
+	expect(format?.disabled).toBeTypeOf('function');
+	if (typeof format?.disabled === 'function') {
+		expect(format.disabled()).toBe(false);
+		plugin.settings.headingNumbers = false;
+		expect(format.disabled()).toBe(true);
+	}
 });
 
 test('declarative changes save and apply settings to open notes', async () => {

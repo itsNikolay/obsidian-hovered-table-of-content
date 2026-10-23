@@ -3,7 +3,7 @@ import type { Heading } from '../../src/headings';
 import { OPEN_DELAY, PopupManager } from '../../src/ui/popup';
 import { StickyHeadings } from '../../src/ui/sticky';
 import { TocController, type TocHost } from '../../src/ui/toc';
-import type { StickyMode } from '../../src/settings';
+import type { NumberFormat, StickyMode } from '../../src/settings';
 
 const headings: Heading[] = [
 	{ level: 1, heading: 'Title', line: 0 },
@@ -29,6 +29,7 @@ describe('StickyHeadings', () => {
 	let manager: PopupManager;
 	let mode: StickyMode;
 	let icons: boolean;
+	let numbers: NumberFormat | null;
 	let selected: Heading[];
 	let sticky: StickyHeadings;
 
@@ -40,14 +41,16 @@ describe('StickyHeadings', () => {
 		manager = new PopupManager(document);
 		mode = 'prev';
 		icons = true;
+		numbers = null;
 		selected = [];
 		sticky = new StickyHeadings({
 			container,
-			toc: new TocController(host, manager),
+			toc: new TocController(host, manager, { linkIcons: () => true, numbers: () => numbers }),
 			path: () => 'Note.md',
 			headings: () => headings,
 			mode: () => mode,
 			icons: () => icons,
+			numbers: () => numbers,
 			onSelect: (h) => selected.push(h),
 		});
 	});
@@ -88,6 +91,32 @@ describe('StickyHeadings', () => {
 		mode = 'path';
 		sticky.update(5);
 		expect(rows().map((r) => r.querySelector('.htoc-sticky-text')!.textContent)).toEqual(['Title', 'Alpha bold', 'Alpha one']);
+	});
+
+	test('sticky headings show their numbers in the note', () => {
+		mode = 'path';
+		const shown = () => rows().map((r) => {
+			const text = r.querySelector<HTMLElement>('.htoc-sticky-text')!;
+			return [r.querySelector('.htoc-sticky-level')!.textContent, text.dataset.number, text.textContent];
+		});
+		sticky.update(7);
+		expect(shown()).toEqual([['H1', undefined, 'Title'], ['H2', undefined, 'Alpha bold'], ['H3', undefined, 'Alpha two']]);
+		numbers = 'level';
+		sticky.refresh();
+		expect(shown()).toEqual([['H1', '1.', 'Title'], ['H2', '1.', 'Alpha bold'], ['H3', '2.', 'Alpha two']]);
+		numbers = 'full';
+		sticky.refresh();
+		expect(shown()).toEqual([['H1', '1.', 'Title'], ['H2', '1.1.', 'Alpha bold'], ['H3', '1.1.2.', 'Alpha two']]);
+	});
+
+	test('the subheadings of a sticky heading keep their numbers in the note', async () => {
+		numbers = 'full';
+		sticky.update(3);
+		rows()[0]!.querySelector('.htoc-sticky-toc')!.dispatchEvent(new MouseEvent('mouseenter'));
+		await vi.advanceTimersByTimeAsync(OPEN_DELAY);
+		const items = [...document.body.querySelectorAll<HTMLElement>('.htoc-toc .htoc-toc-item')];
+		expect(items.map((i) => [i.dataset.number, i.textContent])).toEqual([['1.1.1.', 'Alpha one'], ['1.1.2.', 'Alpha two']]);
+		expect(document.body.querySelector('.htoc-toc .htoc-toc-title')!.textContent).toBe('Alpha bold');
 	});
 
 	test('does not rebuild rows when the headings did not change', () => {

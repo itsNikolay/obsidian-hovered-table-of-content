@@ -4,7 +4,7 @@ import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, typ
 import { editorInfoField, editorLivePreviewField, type MarkdownView } from 'obsidian';
 import { findLinks, type LinkToken } from './links';
 import type HoveredTocPlugin from './main';
-import { popoverPlacement } from './settings';
+import { headingNumberFormat, popoverPlacement } from './settings';
 import { createTocButton, setButtonPosition } from './ui/button';
 import { StickyHeadings } from './ui/sticky';
 
@@ -53,6 +53,7 @@ export class ViewDecoration {
 				headings: () => this.plugin.getHeadings(this.path),
 				mode: () => this.plugin.settings.stickyMode,
 				icons: () => this.plugin.settings.stickyIcons,
+				numbers: () => headingNumberFormat(this.plugin.settings),
 				onSelect: (heading) => this.view.currentMode.applyScroll(heading.line),
 			});
 		} else if (!settings.stickyHeadings && this.sticky) {

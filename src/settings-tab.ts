@@ -1,6 +1,16 @@
 import { App, PluginSettingTab, Setting, requireApiVersion, type SettingDefinitionControl } from 'obsidian';
 import type HoveredTocPlugin from './main';
-import { BUTTON_POSITIONS, STICKY_MODES, type ButtonPosition, type StickyMode, type HoveredTocSettings, DEFAULT_SETTINGS, normalizeSettings } from './settings';
+import {
+	BUTTON_POSITIONS,
+	NUMBER_FORMATS,
+	STICKY_MODES,
+	type ButtonPosition,
+	type NumberFormat,
+	type StickyMode,
+	type HoveredTocSettings,
+	DEFAULT_SETTINGS,
+	normalizeSettings,
+} from './settings';
 
 const POSITION_LABELS: Record<ButtonPosition, string> = {
 	'top-left': 'Top left',
@@ -16,6 +26,11 @@ const STICKY_MODE_LABELS: Record<StickyMode, string> = {
 	path: 'Heading with its parents',
 };
 
+const NUMBER_FORMAT_LABELS: Record<NumberFormat, string> = {
+	level: 'Within the section: 1, 2',
+	full: 'With the parents: 1.1, 1.2',
+};
+
 export class HoveredTocSettingTab extends PluginSettingTab {
 	constructor(
 		app: App,
@@ -26,6 +41,7 @@ export class HoveredTocSettingTab extends PluginSettingTab {
 
 	getSettingDefinitions(): SettingDefinitionControl<keyof HoveredTocSettings>[] {
 		const stickyDisabled = () => !this.plugin.settings.stickyHeadings;
+		const numbersDisabled = () => !this.plugin.settings.headingNumbers;
 		return [
 			{ name: 'Icon position', desc: 'Where the table of contents icon sits in each note.',
 				control: { type: 'dropdown', key: 'buttonPosition', options: POSITION_LABELS, defaultValue: DEFAULT_SETTINGS.buttonPosition } },
@@ -35,6 +51,10 @@ export class HoveredTocSettingTab extends PluginSettingTab {
 				control: { type: 'toggle', key: 'linkIcons', defaultValue: DEFAULT_SETTINGS.linkIcons } },
 			{ name: 'Icons on links in notes', desc: 'Show a table of contents icon next to links to other notes in reading view and live preview.',
 				control: { type: 'toggle', key: 'noteLinkIcons', defaultValue: DEFAULT_SETTINGS.noteLinkIcons } },
+			{ name: 'Heading numbers', desc: 'Number the headings in tables of contents and sticky headings.',
+				control: { type: 'toggle', key: 'headingNumbers', defaultValue: DEFAULT_SETTINGS.headingNumbers } },
+			{ name: 'Heading number format', desc: 'Number each heading within its section, or together with the numbers of its parents.',
+				control: { type: 'dropdown', key: 'numberFormat', options: NUMBER_FORMAT_LABELS, defaultValue: DEFAULT_SETTINGS.numberFormat, disabled: numbersDisabled } },
 			{ name: 'Sticky headings', desc: 'Pin the headings of the current section at the top of the note.',
 				control: { type: 'toggle', key: 'stickyHeadings', defaultValue: DEFAULT_SETTINGS.stickyHeadings } },
 			{ name: 'Sticky heading mode', desc: 'Show only the closest heading above, or that heading together with its parents.',
@@ -84,6 +104,30 @@ export class HoveredTocSettingTab extends PluginSettingTab {
 		iconToggle('Icon in notes', 'Show the table of contents icon in each note.', 'noteIcon');
 		iconToggle('Icons on links', 'Show a table of contents icon next to links in previews and in page previews of notes.', 'linkIcons');
 		iconToggle('Icons on links in notes', 'Show a table of contents icon next to links to other notes in reading view and live preview.', 'noteLinkIcons');
+
+		new Setting(containerEl)
+			.setName('Heading numbers')
+			.setDesc('Number the headings in tables of contents and sticky headings.')
+			.addToggle((toggle) =>
+				toggle.setValue(settings.headingNumbers).onChange(async (value) => {
+					settings.headingNumbers = value;
+					await this.plugin.saveSettings();
+					this.renderLegacy();
+				}),
+			);
+
+		if (settings.headingNumbers) {
+			new Setting(containerEl)
+				.setName('Heading number format')
+				.setDesc('Number each heading within its section, or together with the numbers of its parents.')
+				.addDropdown((dropdown) => {
+					for (const format of NUMBER_FORMATS) dropdown.addOption(format, NUMBER_FORMAT_LABELS[format]);
+					dropdown.setValue(settings.numberFormat).onChange(async (value) => {
+						settings.numberFormat = value as NumberFormat;
+						await this.plugin.saveSettings();
+					});
+				});
+		}
 
 		new Setting(containerEl)
 			.setName('Sticky headings')

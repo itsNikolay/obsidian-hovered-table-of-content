@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { Heading } from '../../src/headings';
+import type { NumberFormat } from '../../src/settings';
 import { CLOSE_DELAY, OPEN_DELAY, PopupManager, type Popup } from '../../src/ui/popup';
 import { TocController, type TocHost } from '../../src/ui/toc';
 
@@ -106,6 +107,37 @@ describe('TocController', () => {
 		expect(items.map((i) => i.textContent)).toEqual(['Main', 'Setup', 'Install', 'Usage']);
 		expect(items.map((i) => i.dataset.depth)).toEqual(['0', '1', '2', '1']);
 		expect(q('.htoc-toc .htoc-toc-title')[0]!.textContent).toBe('Main');
+	});
+
+	test('headings are numbered within their section, or with the numbers of their parents', async () => {
+		let numbers: NumberFormat | null = 'level';
+		toc = new TocController(host, manager, { linkIcons: () => true, numbers: () => numbers });
+		attachMain();
+		const shown = async () => {
+			manager.closeAll();
+			await hover(button);
+			return q('.htoc-toc-item').map((i) => [i.dataset.number, i.textContent]);
+		};
+		expect(await shown()).toEqual([['1.', 'Main'], ['1.', 'Setup'], ['1.', 'Install'], ['2.', 'Usage']]);
+		numbers = 'full';
+		expect(await shown()).toEqual([['1.', 'Main'], ['1.1.', 'Setup'], ['1.1.1.', 'Install'], ['1.2.', 'Usage']]);
+		numbers = null;
+		expect(await shown()).toEqual([[undefined, 'Main'], [undefined, 'Setup'], [undefined, 'Install'], [undefined, 'Usage']]);
+	});
+
+	test('headings are not numbered by default', async () => {
+		attachMain();
+		await hover(button);
+		expect(q('.htoc-toc-item[data-number]')).toHaveLength(0);
+	});
+
+	test('a table of contents of some headings keeps their numbers in the whole note', async () => {
+		toc = new TocController(host, manager, { linkIcons: () => true, numbers: () => 'full' });
+		const all = host.getHeadings('Main.md');
+		toc.attachToc(button, { path: 'Main.md', headings: () => all.slice(1, 3), noteHeadings: () => all }, { side: 'below', align: 'end' });
+		await hover(button);
+		expect(q('.htoc-toc-item').map((i) => [i.dataset.number, i.textContent])).toEqual([['1.1.', 'Setup'], ['1.1.1.', 'Install']]);
+		expect(q('.htoc-toc-item').map((i) => i.dataset.depth)).toEqual(['0', '1']);
 	});
 
 	test('headings are read when the popup opens, not when it is attached', async () => {

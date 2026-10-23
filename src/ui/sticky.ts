@@ -1,5 +1,5 @@
-import { findStickyHeadings, getDisplayText, getSubHeadings, type Heading } from '../headings';
-import type { StickyMode } from '../settings';
+import { findStickyHeadings, getDisplayText, getSubHeadings, headingNumbers, type Heading } from '../headings';
+import type { NumberFormat, StickyMode } from '../settings';
 import { createIcon, type TocController } from './toc';
 
 export interface StickyOptions {
@@ -11,6 +11,8 @@ export interface StickyOptions {
 	mode: () => StickyMode;
 	/** Whether each sticky heading gets a T icon with its subheadings; on when omitted. */
 	icons?: () => boolean;
+	/** The format sticky headings are numbered in, or null for none; none when omitted. */
+	numbers?: () => NumberFormat | null;
 	onSelect: (heading: Heading) => void;
 }
 
@@ -33,10 +35,13 @@ export class StickyHeadings {
 		this.topLine = topLine;
 		const all = this.options.headings();
 		const sticky = findStickyHeadings(all, topLine, this.options.mode());
-		const key = JSON.stringify([this.options.path(), sticky]);
+		const format = this.options.numbers?.();
+		const numbers = format ? headingNumbers(all, format) : null;
+		const rows = sticky.map((heading) => ({ heading, number: numbers?.get(heading.line) }));
+		const key = JSON.stringify([this.options.path(), rows]);
 		if (key === this.shownKey) return;
 		this.shownKey = key;
-		this.render(sticky);
+		this.render(rows);
 	}
 
 	/** Re-renders after the note's headings or the settings changed. */
@@ -45,14 +50,14 @@ export class StickyHeadings {
 		this.update(this.topLine);
 	}
 
-	private render(sticky: Heading[]): void {
+	private render(sticky: { heading: Heading; number?: string }[]): void {
 		for (const detach of this.detachers.splice(0)) detach();
 		const doc = this.el.ownerDocument;
 		const win = doc.win as typeof window;
 		const inner = win.createDiv();
 		inner.className = 'htoc-sticky-inner';
 		const path = this.options.path();
-		for (const heading of sticky) {
+		for (const { heading, number } of sticky) {
 			const row = win.createDiv();
 			row.className = 'htoc-sticky-row';
 			row.dataset.level = String(heading.level);
@@ -63,6 +68,7 @@ export class StickyHeadings {
 			const text = win.createSpan();
 			text.className = 'htoc-sticky-text';
 			text.textContent = getDisplayText(heading.heading);
+			if (number) text.dataset.number = number;
 			text.addEventListener('click', () => this.options.onSelect(heading));
 			row.append(level, text);
 
@@ -71,7 +77,7 @@ export class StickyHeadings {
 				this.detachers.push(
 					this.options.toc.attachToc(
 						icon,
-						{ path, headings: () => this.subHeadingsOf(heading), title: text.textContent },
+						{ path, headings: () => this.subHeadingsOf(heading), noteHeadings: this.options.headings, title: text.textContent },
 						{ side: 'below', align: 'start' },
 					),
 				);

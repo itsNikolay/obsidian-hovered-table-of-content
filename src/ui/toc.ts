@@ -1,4 +1,5 @@
-import { extractSection, getDisplayText, withDepth, type Heading } from '../headings';
+import { extractSection, getDisplayText, headingNumbers, withDepth, type Heading } from '../headings';
+import type { NumberFormat } from '../settings';
 import type { Popup, PopupManager } from './popup';
 import type { Placement } from './position';
 
@@ -26,12 +27,16 @@ export interface PagePreview {
 export interface TocOptions {
 	/** Whether links in previews get a T icon. */
 	linkIcons: () => boolean;
+	/** The format headings are numbered in, or null for none; none when omitted. */
+	numbers?: () => NumberFormat | null;
 }
 
 export interface TocSource {
 	path: string;
 	/** Read when the popup opens, so it always reflects the current note. */
 	headings: () => Heading[];
+	/** All headings of the note, which the numbers are counted over; defaults to `headings`. */
+	noteHeadings?: () => Heading[];
 	/** Popup title; defaults to the note name. */
 	title?: string;
 }
@@ -84,6 +89,8 @@ export class TocController {
 			popup.contentEl.append(empty);
 			return;
 		}
+		const format = this.options.numbers?.();
+		const numbers = format ? headingNumbers(source.noteHeadings?.() ?? headings, format) : null;
 		const list = win.createDiv();
 		list.className = 'htoc-toc-list';
 		for (const { heading, depth } of withDepth(headings)) {
@@ -91,6 +98,9 @@ export class TocController {
 			item.className = 'htoc-toc-item';
 			item.dataset.depth = String(depth);
 			item.dataset.line = String(heading.line);
+			// Shown by CSS, so the number stays out of the heading text.
+			const number = numbers?.get(heading.line);
+			if (number) item.dataset.number = number;
 			item.style.setProperty('--htoc-depth', String(depth));
 			item.textContent = getDisplayText(heading.heading);
 			item.addEventListener('click', (event) => {

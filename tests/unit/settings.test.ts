@@ -2,6 +2,8 @@ import { describe, expect, test } from 'vitest';
 import {
 	BUTTON_POSITIONS,
 	DEFAULT_SETTINGS,
+	NUMBER_FORMATS,
+	headingNumberFormat,
 	normalizeSettings,
 	popoverPlacement,
 	positionClass,
@@ -21,6 +23,18 @@ describe('settings', () => {
 		expect(DEFAULT_SETTINGS.stickyIcons).toBe(true);
 	});
 
+	test('headings are numbered within their section by default', () => {
+		expect(DEFAULT_SETTINGS.headingNumbers).toBe(true);
+		expect(DEFAULT_SETTINGS.numberFormat).toBe('level');
+		expect([...NUMBER_FORMATS]).toEqual(['level', 'full']);
+	});
+
+	test('numbering that is turned off has no format', () => {
+		expect(headingNumberFormat(DEFAULT_SETTINGS)).toBe('level');
+		expect(headingNumberFormat({ ...DEFAULT_SETTINGS, numberFormat: 'full' })).toBe('full');
+		expect(headingNumberFormat({ ...DEFAULT_SETTINGS, headingNumbers: false, numberFormat: 'full' })).toBeNull();
+	});
+
 	test('offers the six screen positions', () => {
 		expect([...BUTTON_POSITIONS]).toEqual([
 			'top-left',
@@ -33,9 +47,9 @@ describe('settings', () => {
 	});
 
 	test('keeps valid saved values and repairs invalid ones', () => {
-		const saved = { buttonPosition: 'bottom-center', stickyHeadings: false, stickyMode: 'prev', noteIcon: false, linkIcons: false, noteLinkIcons: false, stickyIcons: false };
+		const saved = { buttonPosition: 'bottom-center', stickyHeadings: false, stickyMode: 'prev', noteIcon: false, linkIcons: false, noteLinkIcons: false, stickyIcons: false, headingNumbers: false, numberFormat: 'full' };
 		expect(normalizeSettings(saved)).toEqual(saved);
-		expect(normalizeSettings({ buttonPosition: 'middle', stickyHeadings: 'yes', stickyMode: 1, noteIcon: 0, linkIcons: 'no', noteLinkIcons: 1, stickyIcons: null })).toEqual(DEFAULT_SETTINGS);
+		expect(normalizeSettings({ buttonPosition: 'middle', stickyHeadings: 'yes', stickyMode: 1, noteIcon: 0, linkIcons: 'no', noteLinkIcons: 1, stickyIcons: null, headingNumbers: 'on', numberFormat: 'roman' })).toEqual(DEFAULT_SETTINGS);
 		expect(normalizeSettings(null)).toEqual(DEFAULT_SETTINGS);
 		expect(normalizeSettings(undefined)).toEqual(DEFAULT_SETTINGS);
 	});

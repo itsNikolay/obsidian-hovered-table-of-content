@@ -5,6 +5,7 @@ import {
 	getDisplayText,
 	getSectionRange,
 	getSubHeadings,
+	headingNumbers,
 	withDepth,
 	type Heading,
 } from '../../src/headings';
@@ -53,6 +54,45 @@ describe('withDepth', () => {
 
 	test('returns an empty list for no headings', () => {
 		expect(withDepth([])).toEqual([]);
+	});
+});
+
+describe('headingNumbers', () => {
+	const numbered = (format: 'level' | 'full', list = headings) => {
+		const numbers = headingNumbers(list, format);
+		return list.map((x) => [x.heading, numbers.get(x.line)]);
+	};
+
+	test('level format numbers each heading within its section', () => {
+		expect(numbered('level')).toEqual([
+			['Title', '1.'],
+			['Alpha', '1.'],
+			['Alpha one', '1.'],
+			['Beta', '2.'],
+			['Deep', '1.'],
+			['Second', '2.'],
+		]);
+	});
+
+	test('full format adds the numbers of the parents', () => {
+		expect(numbered('full')).toEqual([
+			['Title', '1.'],
+			['Alpha', '1.1.'],
+			['Alpha one', '1.1.1.'],
+			['Beta', '1.2.'],
+			['Deep', '1.2.1.'],
+			['Second', '2.'],
+		]);
+	});
+
+	test('the largest heading is the first level when the note has no h1', () => {
+		const list = [h(2, 'a', 0), h(3, 'b', 1), h(3, 'c', 2), h(2, 'd', 3)];
+		expect(numbered('level', list).map((x) => x[1])).toEqual(['1.', '1.', '2.', '2.']);
+		expect(numbered('full', list).map((x) => x[1])).toEqual(['1.', '1.1.', '1.2.', '2.']);
+	});
+
+	test('returns no numbers for no headings', () => {
+		expect(headingNumbers([], 'full').size).toBe(0);
 	});
 });
 

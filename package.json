@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-hovered-table-of-content",
-	"version": "1.0.1",
+	"version": "1.1.0",
 	"description": "Obsidian plugin: hover a T icon to see a note's table of contents, preview sections, and keep sticky headings on screen.",
 	"main": "main.js",
 	"type": "module",

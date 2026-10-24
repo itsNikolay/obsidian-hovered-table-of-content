@@ -302,7 +302,7 @@ try {
 		await scrollToLine(lineOf('Install') + 6);
 		await page.waitForFunction(() => document.querySelectorAll('.workspace-leaf.mod-active .htoc-sticky-row').length > 0, null, { timeout: 3000 });
 		assert.deepEqual(await stickyTexts(), ['Guide', 'Setup', 'Install'], 'by default the heading comes with its parents');
-		assert.deepEqual(await stickyNumbers(), ['1.', '1.', '1.'], 'sticky headings are numbered');
+		assert.deepEqual(await stickyNumbers(), [null, null, null], 'sticky headings are not numbered by default');
 		if (mode === 'live') await page.screenshot({ path: `${out}/sticky-live.png` });
 	}
 
@@ -381,7 +381,11 @@ try {
 	}
 	await setMode('preview');
 
-	step('settings: the full heading number format, and no numbers');
+	step('settings: numbers on sticky headings, the full heading number format, and no numbers');
+	await updateSettings({ stickyNumbers: true });
+	await scrollToLine(lineOf('Install') + 6);
+	await page.waitForFunction(() => document.querySelector('.workspace-leaf.mod-active .htoc-sticky-row:last-child .htoc-sticky-text')?.getAttribute('data-number') === '1.', null, { timeout: 3000 });
+	assert.deepEqual(await stickyNumbers(), ['1.', '1.', '1.'], 'the setting numbers sticky headings');
 	await updateSettings({ numberFormat: 'full' });
 	await scrollToLine(lineOf('Configure') + 4);
 	await page.waitForFunction(() => document.querySelector('.workspace-leaf.mod-active .htoc-sticky-row:last-child .htoc-sticky-text')?.getAttribute('data-number') === '1.1.2.', null, { timeout: 3000 });
@@ -400,11 +404,14 @@ try {
 	await moveAway();
 	await updateSettings({ headingNumbers: false });
 	await page.waitForTimeout(200);
-	assert.deepEqual(await stickyNumbers(), [null, null, null], 'no numbers on sticky headings');
+	assert.deepEqual(await stickyNumbers(), ['1.', '1.1.', '1.1.2.'], 'sticky headings keep their numbers without numbers in tables of contents');
 	await button.hover();
 	await toc.waitFor({ timeout: 3000 });
 	assert.deepEqual(await numbersOf(toc.locator('.htoc-toc-item')), [null, null, null, null, null, null], 'no numbers in the table of contents');
 	await moveAway();
+	await updateSettings({ stickyNumbers: false });
+	await page.waitForTimeout(200);
+	assert.deepEqual(await stickyNumbers(), [null, null, null], 'no numbers on sticky headings');
 	await updateSettings({ headingNumbers: true, numberFormat: 'level' });
 
 	step('settings tab renders');
@@ -423,7 +430,9 @@ try {
 	assert.match((await stickyToggle.getAttribute('class')) ?? '', /is-enabled/, 'sticky headings are on by default');
 	for (const name of ['Icon in notes', 'Icons on links', 'Icons on links in notes', 'Icons on sticky headings'])
 		assert.match((await settingRow(name).locator('.checkbox-container').getAttribute('class')) ?? '', /is-enabled/, `${name} is on by default`);
-	assert.match((await settingRow('Heading numbers').locator('.checkbox-container').getAttribute('class')) ?? '', /is-enabled/, 'heading numbers are on by default');
+	assert.match((await settingRow('Heading numbers in tables of contents').locator('.checkbox-container').getAttribute('class')) ?? '', /is-enabled/, 'heading numbers in tables of contents are on by default');
+	const stickyNumbersToggle = settingRow('Numbers on sticky headings').locator('.checkbox-container');
+	assert.doesNotMatch((await stickyNumbersToggle.getAttribute('class')) ?? '', /is-enabled/, 'numbers on sticky headings are off by default');
 	const formatSelect = settingRow('Heading number format').locator('select:not(.is-measuring)');
 	assert.deepEqual(await formatSelect.locator('option').allTextContents(), ['Within the section: 1, 2', 'With the parents: 1.1, 1.2']);
 	assert.equal(await formatSelect.inputValue(), 'level');
@@ -447,14 +456,20 @@ try {
 	await toc.waitFor({ timeout: 3000 });
 	assert.deepEqual(await numbersOf(toc.locator('.htoc-toc-item')), ['1.', '1.1.', '1.1.1.', '1.1.2.', '1.2.', '1.3.'], 'the dropdown changes the number format');
 	await moveAway();
-	const numbersToggle = settingRow('Heading numbers').locator('.checkbox-container');
+	const numbersToggle = settingRow('Heading numbers in tables of contents').locator('.checkbox-container');
+	const savedNumbers = () => page!.evaluate(async () => {
+		const saved = await (globalThis as any).app.plugins.plugins['hovered-table-of-content'].loadData();
+		return [saved.headingNumbers, saved.stickyNumbers, saved.numberFormat];
+	});
 	await numbersToggle.click();
 	await page.waitForTimeout(300);
 	assert.equal(await formatSelect.isDisabled(), true, 'the number format is disabled without numbers');
-	assert.deepEqual(await page.evaluate(async () => {
-		const saved = await (globalThis as any).app.plugins.plugins['hovered-table-of-content'].loadData();
-		return [saved.headingNumbers, saved.numberFormat];
-	}), [false, 'full'], 'the number settings persist');
+	assert.deepEqual(await savedNumbers(), [false, false, 'full'], 'the number settings persist');
+	await stickyNumbersToggle.click();
+	await page.waitForTimeout(300);
+	assert.equal(await formatSelect.isDisabled(), false, 'numbers on sticky headings enable the number format');
+	assert.deepEqual(await savedNumbers(), [false, true, 'full'], 'numbers on sticky headings persist');
+	await stickyNumbersToggle.click();
 	await numbersToggle.click();
 	await page.waitForTimeout(300);
 	assert.equal(await formatSelect.isDisabled(), false, 'the number format is enabled again');

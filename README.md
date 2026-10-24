@@ -26,7 +26,7 @@ Obsidian's core Outline view lives in a sidebar and only shows the active note. 
 - **T on links in notes.** Every link to another note in the note itself gets a **T** right after it, in Reading view and Live Preview. Hover over it to see the linked note's table of contents.
 - **T in page previews.** Obsidian's page previews of notes get a **T** button too, with the table of contents of the previewed note.
 - **Sticky headings.** When you scroll past a heading, it stays pinned at the top of the note. Click it to jump back. Each sticky heading has a **T** icon that lists only that heading's subheadings.
-- **Heading numbers.** Headings in the table of contents and in sticky headings are numbered, either within their section (`1.`, `2.`) or together with the numbers of their parents (`1.1.`, `1.2.`). Your notes stay unchanged.
+- **Heading numbers.** Headings in the table of contents are numbered, either within their section (`1.`, `2.`) or together with the numbers of their parents (`1.1.`, `1.2.`). Sticky headings can be numbered too. Your notes stay unchanged.
 
 It works in Reading view, Live Preview and Source mode, with light and dark themes.
 
@@ -60,11 +60,12 @@ Requires Obsidian 1.5.7 or later.
 | Icon in notes | On | Shows the **T** button in each note. |
 | Icons on links | On | Shows a **T** next to links in previews and in Obsidian's page previews of notes. |
 | Icons on links in notes | On | Shows a **T** next to links to other notes in the note itself, in Reading view and Live Preview. |
-| Heading numbers | On | Numbers the headings in tables of contents and sticky headings. |
+| Heading numbers in tables of contents | On | Numbers the headings in tables of contents. |
 | Heading number format | Within the section | *Within the section* numbers each heading among its siblings: `1.`, `2.`. *With the parents* adds the numbers of its parent headings: `1.1.`, `1.2.`. |
 | Sticky headings | On | Turns sticky headings on or off. |
 | Sticky heading mode | Heading with its parents | *Closest heading* shows only the last heading above the screen. *Heading with its parents* also shows its parent headings. |
 | Icons on sticky headings | On | Shows a **T** with the subheadings next to each sticky heading. |
+| Numbers on sticky headings | Off | Numbers the sticky headings in the heading number format. |
 
 ## Release security checks
 

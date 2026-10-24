@@ -3,10 +3,11 @@ import {
 	BUTTON_POSITIONS,
 	DEFAULT_SETTINGS,
 	NUMBER_FORMATS,
-	headingNumberFormat,
 	normalizeSettings,
 	popoverPlacement,
 	positionClass,
+	stickyNumberFormat,
+	tocNumberFormat,
 } from '../../src/settings';
 
 describe('settings', () => {
@@ -23,16 +24,27 @@ describe('settings', () => {
 		expect(DEFAULT_SETTINGS.stickyIcons).toBe(true);
 	});
 
-	test('headings are numbered within their section by default', () => {
+	test('tables of contents are numbered within the section by default, sticky headings are not', () => {
 		expect(DEFAULT_SETTINGS.headingNumbers).toBe(true);
+		expect(DEFAULT_SETTINGS.stickyNumbers).toBe(false);
 		expect(DEFAULT_SETTINGS.numberFormat).toBe('level');
 		expect([...NUMBER_FORMATS]).toEqual(['level', 'full']);
 	});
 
 	test('numbering that is turned off has no format', () => {
-		expect(headingNumberFormat(DEFAULT_SETTINGS)).toBe('level');
-		expect(headingNumberFormat({ ...DEFAULT_SETTINGS, numberFormat: 'full' })).toBe('full');
-		expect(headingNumberFormat({ ...DEFAULT_SETTINGS, headingNumbers: false, numberFormat: 'full' })).toBeNull();
+		expect(tocNumberFormat(DEFAULT_SETTINGS)).toBe('level');
+		expect(tocNumberFormat({ ...DEFAULT_SETTINGS, numberFormat: 'full' })).toBe('full');
+		expect(tocNumberFormat({ ...DEFAULT_SETTINGS, headingNumbers: false, numberFormat: 'full' })).toBeNull();
+		expect(stickyNumberFormat(DEFAULT_SETTINGS)).toBeNull();
+		expect(stickyNumberFormat({ ...DEFAULT_SETTINGS, stickyNumbers: true, numberFormat: 'full' })).toBe('full');
+		expect(stickyNumberFormat({ ...DEFAULT_SETTINGS, headingNumbers: false, stickyNumbers: true })).toBe('level');
+	});
+
+	test('settings saved by 1.1.0 keep numbers in tables of contents only', () => {
+		const settings = normalizeSettings({ headingNumbers: true, numberFormat: 'full' });
+		expect(settings.headingNumbers).toBe(true);
+		expect(settings.stickyNumbers).toBe(false);
+		expect(settings.numberFormat).toBe('full');
 	});
 
 	test('offers the six screen positions', () => {
@@ -47,9 +59,9 @@ describe('settings', () => {
 	});
 
 	test('keeps valid saved values and repairs invalid ones', () => {
-		const saved = { buttonPosition: 'bottom-center', stickyHeadings: false, stickyMode: 'prev', noteIcon: false, linkIcons: false, noteLinkIcons: false, stickyIcons: false, headingNumbers: false, numberFormat: 'full' };
+		const saved = { buttonPosition: 'bottom-center', stickyHeadings: false, stickyMode: 'prev', noteIcon: false, linkIcons: false, noteLinkIcons: false, stickyIcons: false, headingNumbers: false, stickyNumbers: true, numberFormat: 'full' };
 		expect(normalizeSettings(saved)).toEqual(saved);
-		expect(normalizeSettings({ buttonPosition: 'middle', stickyHeadings: 'yes', stickyMode: 1, noteIcon: 0, linkIcons: 'no', noteLinkIcons: 1, stickyIcons: null, headingNumbers: 'on', numberFormat: 'roman' })).toEqual(DEFAULT_SETTINGS);
+		expect(normalizeSettings({ buttonPosition: 'middle', stickyHeadings: 'yes', stickyMode: 1, noteIcon: 0, linkIcons: 'no', noteLinkIcons: 1, stickyIcons: null, headingNumbers: 'on', stickyNumbers: 1, numberFormat: 'roman' })).toEqual(DEFAULT_SETTINGS);
 		expect(normalizeSettings(null)).toEqual(DEFAULT_SETTINGS);
 		expect(normalizeSettings(undefined)).toEqual(DEFAULT_SETTINGS);
 	});

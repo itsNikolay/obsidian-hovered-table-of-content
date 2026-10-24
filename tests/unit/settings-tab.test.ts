@@ -23,13 +23,24 @@ test('indexes every setting and keeps dependent controls discoverable', () => {
 	expect(mode?.disabled).toBeTypeOf('function');
 	plugin.settings.stickyHeadings = false;
 	if (typeof mode?.disabled === 'function') expect(mode.disabled()).toBe(true);
-	const format = controls.find((control) => control.key === 'numberFormat');
-	expect(format?.disabled).toBeTypeOf('function');
-	if (typeof format?.disabled === 'function') {
-		expect(format.disabled()).toBe(false);
-		plugin.settings.headingNumbers = false;
-		expect(format.disabled()).toBe(true);
-	}
+	const stickyNumbers = controls.find((control) => control.key === 'stickyNumbers');
+	expect(stickyNumbers?.type).toBe('toggle');
+	if (typeof stickyNumbers?.disabled === 'function') expect(stickyNumbers.disabled()).toBe(true);
+	else expect.fail('numbers on sticky headings depend on sticky headings');
+});
+
+test('the number format is disabled only when nothing is numbered', () => {
+	const plugin = { settings: { ...DEFAULT_SETTINGS }, saveSettings: vi.fn() };
+	const tab = new HoveredTocSettingTab({} as App, plugin as unknown as HoveredTocPlugin);
+	const format = tab.getSettingDefinitions().flatMap((item) => 'control' in item && item.control?.key === 'numberFormat' ? [item.control] : [])[0];
+	if (typeof format?.disabled !== 'function') return expect.fail('the number format depends on the numbering settings');
+	expect(format.disabled()).toBe(false);
+	plugin.settings.headingNumbers = false;
+	expect(format.disabled()).toBe(true);
+	plugin.settings.stickyNumbers = true;
+	expect(format.disabled()).toBe(false);
+	plugin.settings.stickyHeadings = false;
+	expect(format.disabled()).toBe(true);
 });
 
 test('declarative changes save and apply settings to open notes', async () => {

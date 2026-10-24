@@ -24,8 +24,10 @@ export interface HoveredTocSettings {
 	noteLinkIcons: boolean;
 	/** T icons on sticky headings. */
 	stickyIcons: boolean;
-	/** Numbers before the headings in tables of contents and sticky headings. */
+	/** Numbers before the headings in tables of contents. */
 	headingNumbers: boolean;
+	/** Numbers before sticky headings. */
+	stickyNumbers: boolean;
 	/** `level`: the number within its section (`2.`); `full`: with the numbers of its parents (`1.2.`). */
 	numberFormat: NumberFormat;
 }
@@ -39,6 +41,7 @@ export const DEFAULT_SETTINGS: Readonly<HoveredTocSettings> = Object.freeze({
 	noteLinkIcons: true,
 	stickyIcons: true,
 	headingNumbers: true,
+	stickyNumbers: false,
 	numberFormat: 'level',
 });
 
@@ -49,7 +52,7 @@ function isOneOf<T extends string>(values: readonly T[], value: unknown): value 
 /** Saved data merged over the defaults; unknown or malformed values fall back to the default. */
 export function normalizeSettings(raw: unknown): HoveredTocSettings {
 	const data = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
-	const flag = (key: 'stickyHeadings' | 'noteIcon' | 'linkIcons' | 'noteLinkIcons' | 'stickyIcons' | 'headingNumbers') =>
+	const flag = (key: 'stickyHeadings' | 'noteIcon' | 'linkIcons' | 'noteLinkIcons' | 'stickyIcons' | 'headingNumbers' | 'stickyNumbers') =>
 		typeof data[key] === 'boolean' ? data[key] : DEFAULT_SETTINGS[key];
 	return {
 		buttonPosition: isOneOf(BUTTON_POSITIONS, data.buttonPosition) ? data.buttonPosition : DEFAULT_SETTINGS.buttonPosition,
@@ -60,13 +63,19 @@ export function normalizeSettings(raw: unknown): HoveredTocSettings {
 		noteLinkIcons: flag('noteLinkIcons'),
 		stickyIcons: flag('stickyIcons'),
 		headingNumbers: flag('headingNumbers'),
+		stickyNumbers: flag('stickyNumbers'),
 		numberFormat: isOneOf(NUMBER_FORMATS, data.numberFormat) ? data.numberFormat : DEFAULT_SETTINGS.numberFormat,
 	};
 }
 
-/** The format headings are numbered in, or null when numbering is off. */
-export function headingNumberFormat(settings: HoveredTocSettings): NumberFormat | null {
+/** The format headings in tables of contents are numbered in, or null when numbering is off. */
+export function tocNumberFormat(settings: HoveredTocSettings): NumberFormat | null {
 	return settings.headingNumbers ? settings.numberFormat : null;
+}
+
+/** The format sticky headings are numbered in, or null when numbering is off. */
+export function stickyNumberFormat(settings: HoveredTocSettings): NumberFormat | null {
+	return settings.stickyNumbers ? settings.numberFormat : null;
 }
 
 export function positionClass(position: ButtonPosition): string {

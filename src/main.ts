@@ -11,7 +11,7 @@ import {
 	type HoverPopover,
 } from 'obsidian';
 import type { Heading } from './headings';
-import { headingNumberFormat, normalizeSettings, popoverPlacement, type HoveredTocSettings } from './settings';
+import { normalizeSettings, popoverPlacement, tocNumberFormat, type HoveredTocSettings } from './settings';
 import { HoveredTocSettingTab } from './settings-tab';
 import { PopupManager } from './ui/popup';
 import { TocController, createIcon, type TocHost } from './ui/toc';
@@ -119,7 +119,7 @@ export default class HoveredTocPlugin extends Plugin {
 		let layer = this.layers.get(doc);
 		if (!layer) {
 			const popups = new PopupManager(doc);
-			const options = { linkIcons: () => this.settings.linkIcons, numbers: () => headingNumberFormat(this.settings) };
+			const options = { linkIcons: () => this.settings.linkIcons, numbers: () => tocNumberFormat(this.settings) };
 			layer = { popups, toc: new TocController(this.host, popups, options) };
 			this.layers.set(doc, layer);
 		}

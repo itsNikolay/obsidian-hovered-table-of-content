@@ -31,6 +31,9 @@ const NUMBER_FORMAT_LABELS: Record<NumberFormat, string> = {
 	full: 'With the parents: 1.1, 1.2',
 };
 
+/** Whether any headings are numbered, so the number format matters. */
+const hasNumbers = (settings: HoveredTocSettings) => settings.headingNumbers || (settings.stickyHeadings && settings.stickyNumbers);
+
 export class HoveredTocSettingTab extends PluginSettingTab {
 	constructor(
 		app: App,
@@ -41,7 +44,7 @@ export class HoveredTocSettingTab extends PluginSettingTab {
 
 	getSettingDefinitions(): SettingDefinitionControl<keyof HoveredTocSettings>[] {
 		const stickyDisabled = () => !this.plugin.settings.stickyHeadings;
-		const numbersDisabled = () => !this.plugin.settings.headingNumbers;
+		const numbersDisabled = () => !hasNumbers(this.plugin.settings);
 		return [
 			{ name: 'Icon position', desc: 'Where the table of contents icon sits in each note.',
 				control: { type: 'dropdown', key: 'buttonPosition', options: POSITION_LABELS, defaultValue: DEFAULT_SETTINGS.buttonPosition } },
@@ -51,7 +54,7 @@ export class HoveredTocSettingTab extends PluginSettingTab {
 				control: { type: 'toggle', key: 'linkIcons', defaultValue: DEFAULT_SETTINGS.linkIcons } },
 			{ name: 'Icons on links in notes', desc: 'Show a table of contents icon next to links to other notes in reading view and live preview.',
 				control: { type: 'toggle', key: 'noteLinkIcons', defaultValue: DEFAULT_SETTINGS.noteLinkIcons } },
-			{ name: 'Heading numbers', desc: 'Number the headings in tables of contents and sticky headings.',
+			{ name: 'Heading numbers in tables of contents', desc: 'Number the headings in tables of contents.',
 				control: { type: 'toggle', key: 'headingNumbers', defaultValue: DEFAULT_SETTINGS.headingNumbers } },
 			{ name: 'Heading number format', desc: 'Number each heading within its section, or together with the numbers of its parents.',
 				control: { type: 'dropdown', key: 'numberFormat', options: NUMBER_FORMAT_LABELS, defaultValue: DEFAULT_SETTINGS.numberFormat, disabled: numbersDisabled } },
@@ -61,6 +64,8 @@ export class HoveredTocSettingTab extends PluginSettingTab {
 				control: { type: 'dropdown', key: 'stickyMode', options: STICKY_MODE_LABELS, defaultValue: DEFAULT_SETTINGS.stickyMode, disabled: stickyDisabled } },
 			{ name: 'Icons on sticky headings', desc: 'Show an icon with the subheadings next to each sticky heading.',
 				control: { type: 'toggle', key: 'stickyIcons', defaultValue: DEFAULT_SETTINGS.stickyIcons, disabled: stickyDisabled } },
+			{ name: 'Numbers on sticky headings', desc: 'Number the sticky headings in the heading number format.',
+				control: { type: 'toggle', key: 'stickyNumbers', defaultValue: DEFAULT_SETTINGS.stickyNumbers, disabled: stickyDisabled } },
 		];
 	}
 
@@ -106,8 +111,8 @@ export class HoveredTocSettingTab extends PluginSettingTab {
 		iconToggle('Icons on links in notes', 'Show a table of contents icon next to links to other notes in reading view and live preview.', 'noteLinkIcons');
 
 		new Setting(containerEl)
-			.setName('Heading numbers')
-			.setDesc('Number the headings in tables of contents and sticky headings.')
+			.setName('Heading numbers in tables of contents')
+			.setDesc('Number the headings in tables of contents.')
 			.addToggle((toggle) =>
 				toggle.setValue(settings.headingNumbers).onChange(async (value) => {
 					settings.headingNumbers = value;
@@ -116,7 +121,7 @@ export class HoveredTocSettingTab extends PluginSettingTab {
 				}),
 			);
 
-		if (settings.headingNumbers) {
+		if (hasNumbers(settings)) {
 			new Setting(containerEl)
 				.setName('Heading number format')
 				.setDesc('Number each heading within its section, or together with the numbers of its parents.')
@@ -152,6 +157,16 @@ export class HoveredTocSettingTab extends PluginSettingTab {
 					});
 				});
 			iconToggle('Icons on sticky headings', 'Show an icon with the subheadings next to each sticky heading.', 'stickyIcons');
+			new Setting(containerEl)
+				.setName('Numbers on sticky headings')
+				.setDesc('Number the sticky headings in the heading number format.')
+				.addToggle((toggle) =>
+					toggle.setValue(settings.stickyNumbers).onChange(async (value) => {
+						settings.stickyNumbers = value;
+						await this.plugin.saveSettings();
+						this.renderLegacy();
+					}),
+				);
 		}
 	}
 }

@@ -44,6 +44,51 @@ describe('PopupManager', () => {
 		expect(popups()).toHaveLength(0);
 	});
 
+	test('the trigger is marked active while its popup is open, also after the pointer moves into the popup', () => {
+		attachText(trigger, 'hello');
+		enter(trigger);
+		expect(trigger.classList.contains('is-active')).toBe(false);
+		vi.advanceTimersByTime(OPEN_DELAY);
+		expect(trigger.classList.contains('is-active')).toBe(true);
+		leave(trigger);
+		enter(popups()[0]!);
+		vi.advanceTimersByTime(CLOSE_DELAY * 3);
+		expect(trigger.classList.contains('is-active')).toBe(true);
+		leave(popups()[0]!);
+		vi.advanceTimersByTime(CLOSE_DELAY);
+		expect(trigger.classList.contains('is-active')).toBe(false);
+	});
+
+	test('a popup is marked while more of its content is out of view below', async () => {
+		let contentHeight = 100;
+		manager.attach(trigger, {
+			className: 'x',
+			placement: { side: 'below', align: 'start' },
+			// jsdom has no layout: the popup is 100px high.
+			render: (popup) => {
+				Object.defineProperty(popup.el, 'clientHeight', { configurable: true, value: 100 });
+				Object.defineProperty(popup.el, 'scrollHeight', { configurable: true, value: contentHeight });
+			},
+		});
+		const scroll = (el: Element, top: number) => {
+			Object.defineProperty(el, 'scrollTop', { configurable: true, value: top });
+			el.dispatchEvent(new Event('scroll'));
+		};
+		const marked = () => popups()[0]!.classList.contains('has-more-below');
+		enter(trigger);
+		await vi.advanceTimersByTimeAsync(OPEN_DELAY);
+		expect(marked()).toBe(false);
+		manager.closeAll();
+		contentHeight = 300;
+		enter(trigger);
+		await vi.advanceTimersByTimeAsync(OPEN_DELAY);
+		expect(marked()).toBe(true);
+		scroll(popups()[0]!, 200);
+		expect(marked()).toBe(false);
+		scroll(popups()[0]!, 150);
+		expect(marked()).toBe(true);
+	});
+
 	test('a quick pass over the trigger does not open anything', () => {
 		attachText(trigger, 'hello');
 		enter(trigger);

@@ -20,8 +20,8 @@ Obsidian's core Outline view lives in a sidebar and only shows the active note. 
 
 ## Features
 
-- **T icon.** Every note gets a small square **T** button right after its title. Hover over it to see the note's table of contents in a popup.
-- **Section previews.** Hover over a heading in the table of contents to preview that section: the heading, its text and its subsections. Click the heading to jump to it (Ctrl/Cmd-click opens it in a new tab).
+- **T icon.** Every note gets a small square **T** button right after its title. Hover over it to see the note's table of contents in a popup. When a table of contents or a preview is too long to fit, its bottom fades out until you scroll to the end.
+- **Section previews.** Hover over a heading in the table of contents to preview that section: the heading, its text and its subsections. The heading stays highlighted while its preview is open, so you can see which section you are reading. Click the heading to jump to it (Ctrl/Cmd-click opens it in a new tab).
 - **Previews of linked notes.** Hover over a link inside a preview to see the linked note in Obsidian's page preview. Every link to another note also gets its own **T** icon. Hover over it to see the linked note's table of contents, which previews its sections in turn.
 - **T on links in notes.** Every link to another note in the note itself gets a **T** right after it, in Reading view and Live Preview. Hover over it to see the linked note's table of contents.
 - **T in page previews.** Obsidian's page previews of notes get a **T** button too, with the table of contents of the previewed note.

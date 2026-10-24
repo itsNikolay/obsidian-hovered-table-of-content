@@ -42,6 +42,7 @@ const main = [
 await writeFile(`${vault}/Main.md`, main + '\n');
 await writeFile(`${vault}/Other.md`, '# Other note\n\nOther intro.\n\n## Other part\n\nOther details live here. See [[Third]].\n');
 await writeFile(`${vault}/Third.md`, '# Third note\n\nThird intro.\n\n## Third part\n\nThird details.\n');
+await writeFile(`${vault}/Long.md`, Array.from({ length: 50 }, (_, i) => `## Part ${i + 1}\n\nPart ${i + 1} text.`).join('\n\n') + '\n');
 const lineOf = (heading: string) => main.split('\n').findIndex((l) => l.replace(/^#+ /, '') === heading && l.startsWith('#'));
 
 const errors: string[] = [];
@@ -71,6 +72,19 @@ const stickyTexts = () => page!.locator('.workspace-leaf.mod-active .htoc-sticky
 const numbersOf = (items: Locator) => items.evaluateAll((els) => els.map((el) => (el as HTMLElement).dataset.number ?? null));
 const stickyNumbers = () => numbersOf(page!.locator('.workspace-leaf.mod-active .htoc-sticky-row .htoc-sticky-text'));
 
+
+/** The bottom of a popup that does not fit fades out until it is scrolled to the end, and fades out again when scrolled back up. */
+async function checkBottomFade(popup: Locator, what: string) {
+	const fadeAfterScroll = async (to: 'top' | 'end' | 'up') => {
+		await popup.evaluate((el, to) => el.scrollTo(0, to === 'top' ? 0 : to === 'end' ? el.scrollHeight : el.scrollTop - 100), to);
+		await page!.waitForTimeout(300);
+		return popup.evaluate((el) => getComputedStyle(el, '::after').opacity);
+	};
+	assert.equal(await fadeAfterScroll('top'), '0.7', `${what} fades out at the bottom`);
+	assert.equal(await fadeAfterScroll('end'), '0', `the fade disappears at the end of ${what}`);
+	assert.equal(await fadeAfterScroll('up'), '0.7', `the fade comes back when ${what} is scrolled up`);
+	await fadeAfterScroll('top');
+}
 
 async function moveAway() {
 	await page!.mouse.move(700, 990);
@@ -150,12 +164,16 @@ try {
 	await linkIcon.waitFor({ timeout: 3000 });
 	assert.equal(await linkIcon.evaluate((el) => getComputedStyle(el).cursor), 'pointer', 'the T next to a link shows a pointer cursor');
 	await page.screenshot({ path: `${out}/section-preview.png` });
+	await checkBottomFade(preview, 'a long section preview');
+	assert.equal(await toc.evaluate((el) => getComputedStyle(el, '::after').opacity), '0', 'a table of contents that fits does not fade out');
 
 	step('the link icon shows the linked note table of contents, which previews too');
 	await linkIcon.hover();
 	const nestedToc = page.locator('.htoc-toc').nth(1);
 	await nestedToc.waitFor({ timeout: 3000 });
 	assert.deepEqual(await nestedToc.locator('.htoc-toc-item').allTextContents(), ['Other note', 'Other part']);
+	const background = (text: string) => toc.locator('.htoc-toc-item', { hasText: text }).evaluate((el) => getComputedStyle(el).backgroundColor);
+	assert.notEqual(await background('Setup'), await background('Install'), 'the heading of the open preview stays highlighted');
 	await nestedToc.locator('.htoc-toc-item', { hasText: 'Other part' }).hover();
 	const nestedPreview = page.locator('.htoc-preview').nth(1);
 	await nestedPreview.waitFor({ timeout: 3000 });
@@ -263,6 +281,21 @@ try {
 	const scroll = await page.evaluate(() => (globalThis as any).app.workspace.getMostRecentLeaf().view.currentMode.getScroll());
 	assert.ok(Math.abs(scroll - lineOf('Usage')) < 3, `scrolled to Usage (line ${lineOf('Usage')}), got ${scroll}`);
 	await moveAway();
+
+	step('a long table of contents fades out at the bottom until it is scrolled to the end');
+	await page.evaluate(async () => {
+		const g = globalThis as any;
+		await g.app.workspace.getMostRecentLeaf().openFile(g.app.vault.getAbstractFileByPath('Long.md'));
+	});
+	await page.waitForTimeout(600);
+	await button.hover();
+	await toc.waitFor({ timeout: 3000 });
+	assert.equal(await toc.locator('.htoc-toc-item').count(), 50);
+	await page.waitForTimeout(300);
+	await page.screenshot({ path: `${out}/long-toc.png` });
+	await checkBottomFade(toc, 'a long table of contents');
+	await moveAway();
+	await setMode('preview');
 
 	const noteLinkIcons = (mode: 'preview' | 'live' | 'source') =>
 		page!.locator(`.workspace-leaf.mod-active ${mode === 'preview' ? '.markdown-reading-view' : '.markdown-source-view'} .htoc-note-link-toc`);

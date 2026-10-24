@@ -8,4 +8,10 @@ if (typeof document !== 'undefined') {
 		this.appendChild(el);
 		return el;
 	};
+	// jsdom has no layout, so nothing ever resizes.
+	window.ResizeObserver ??= class {
+		observe() {}
+		unobserve() {}
+		disconnect() {}
+	};
 }

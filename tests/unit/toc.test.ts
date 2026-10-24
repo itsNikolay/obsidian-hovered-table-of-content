@@ -186,6 +186,23 @@ describe('TocController', () => {
 		expect(preview[0]!.textContent).not.toContain('use it');
 	});
 
+	test('the item of the open preview stays marked while the pointer is in the preview and deeper', async () => {
+		attachMain();
+		await hover(button);
+		const active = () => q('.htoc-toc-item.is-active').map((i) => i.textContent);
+		const [, setup, , usage] = q('.htoc-toc-item');
+		await hover(setup!);
+		leave(setup!);
+		enter(q('.htoc-preview')[0]!);
+		await hover(q('.htoc-preview .htoc-link-toc')[0]!);
+		await vi.advanceTimersByTimeAsync(CLOSE_DELAY * 3);
+		expect(active()).toEqual(['Setup']);
+		await hover(usage!);
+		expect(active()).toEqual(['Usage']);
+		manager.closeAll();
+		expect(usage!.classList.contains('is-active')).toBe(false);
+	});
+
 	test('links inside the preview get a T icon with the linked note headings', async () => {
 		attachMain();
 		await hover(button);

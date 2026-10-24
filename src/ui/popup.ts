@@ -13,6 +13,8 @@ export interface PopupOptions {
 /**
  * A hover popup. It stays open while the pointer is over its trigger, over the popup itself,
  * over an element it holds, or while one of its child popups (opened from a trigger inside it) is open.
+ * Its trigger has the `is-active` class while it is open, so it can stay highlighted once the pointer moves on.
+ * The popup has the `has-more-below` class while part of its content is scrolled out of view below.
  */
 export class Popup {
 	readonly el: HTMLElement;
@@ -38,6 +40,13 @@ export class Popup {
 		this.contentEl = win.createDiv();
 		this.contentEl.className = 'htoc-popup-content';
 		this.el.append(this.contentEl);
+		trigger.classList.add('is-active');
+		this.el.addEventListener('scroll', () => this.updateMoreBelow(), { passive: true });
+		// Rendered markdown can grow after it is rendered, e.g. when its images load.
+		const resize = new win.ResizeObserver(() => this.updateMoreBelow());
+		resize.observe(this.el);
+		resize.observe(this.contentEl);
+		this.onClose(() => resize.disconnect());
 		this.el.addEventListener('mouseenter', () => {
 			this.selfHovered = true;
 			this.cancelClose();
@@ -110,6 +119,14 @@ export class Popup {
 			this.contentEl.textContent = `Could not render: ${error instanceof Error ? error.message : String(error)}`;
 		}
 		this.position();
+		this.updateMoreBelow();
+	}
+
+	private updateMoreBelow(): void {
+		if (this.closed) return;
+		const { scrollTop, clientHeight, scrollHeight } = this.el;
+		// A pixel of slack for fractional scroll positions on zoomed displays.
+		this.el.classList.toggle('has-more-below', scrollTop + clientHeight < scrollHeight - 1);
 	}
 
 	cancelClose(): void {
@@ -136,6 +153,7 @@ export class Popup {
 		this.cancelClose();
 		this.child?.close();
 		for (const cleanup of this.cleanups.splice(0)) cleanup();
+		this.trigger.classList.remove('is-active');
 		this.el.remove();
 		this.manager.forget(this);
 		if (this.parent) {

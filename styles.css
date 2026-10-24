@@ -99,10 +99,34 @@
 	font-size: var(--font-ui-small);
 }
 
+/*
+ * While more of a popup is out of view below, its bottom fades out; the text under the fade stays readable.
+ * The popups keep their padding on the content inside, so the fade sticks to the bottom edge of the popup.
+ */
+.htoc-popup::after {
+	content: "";
+	display: block;
+	position: sticky;
+	bottom: 0;
+	height: 32px;
+	margin-top: -32px;
+	background: linear-gradient(to bottom, transparent, var(--background-primary));
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 150ms ease;
+}
+
+.htoc-popup.has-more-below::after {
+	opacity: 0.7;
+}
+
 .htoc-toc {
 	min-width: 200px;
 	max-width: 360px;
 	max-height: 70vh;
+}
+
+.htoc-toc > .htoc-popup-content {
 	padding: 6px;
 }
 
@@ -133,7 +157,9 @@
 	font-weight: var(--font-semibold);
 }
 
-.htoc-toc-item:hover {
+/* The heading whose section preview is open stays highlighted while the pointer is in the preview. */
+.htoc-toc-item:hover,
+.htoc-toc-item.is-active {
 	background-color: var(--background-modifier-hover);
 }
 
@@ -151,8 +177,11 @@
 	width: calc(var(--popover-width) + 2 * var(--border-width));
 	max-width: 80vw;
 	max-height: var(--popover-height);
-	padding: var(--file-margins);
 	font-size: var(--popover-font-size);
+}
+
+.htoc-preview > .htoc-popup-content {
+	padding: var(--file-margins);
 }
 
 .htoc-preview-content > :first-child {

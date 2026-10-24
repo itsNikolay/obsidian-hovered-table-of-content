@@ -43,6 +43,17 @@ test('the number format is disabled only when nothing is numbered', () => {
 	expect(format.disabled()).toBe(true);
 });
 
+test('the icon after the note title is disabled without the icon in notes', () => {
+	const plugin = { settings: { ...DEFAULT_SETTINGS }, saveSettings: vi.fn() };
+	const tab = new HoveredTocSettingTab({} as App, plugin as unknown as HoveredTocPlugin);
+	const title = tab.getSettingDefinitions().flatMap((item) => 'control' in item && item.control?.key === 'titleIcon' ? [item.control] : [])[0];
+	expect(title?.type).toBe('toggle');
+	if (typeof title?.disabled !== 'function') return expect.fail('the icon after the note title depends on the icon in notes');
+	expect(title.disabled()).toBe(false);
+	plugin.settings.noteIcon = false;
+	expect(title.disabled()).toBe(true);
+});
+
 test('declarative changes save and apply settings to open notes', async () => {
 	const plugin = { settings: { ...DEFAULT_SETTINGS }, saveSettings: vi.fn().mockResolvedValue(undefined) };
 	const tab = new HoveredTocSettingTab({} as App, plugin as unknown as HoveredTocPlugin);

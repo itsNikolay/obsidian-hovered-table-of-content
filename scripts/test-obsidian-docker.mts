@@ -414,6 +414,101 @@ try {
 	assert.deepEqual(await stickyNumbers(), [null, null, null], 'no numbers on sticky headings');
 	await updateSettings({ headingNumbers: true, numberFormat: 'level' });
 
+	step('the T sits right after the inline title in every mode');
+	const titleEnd = () => page!.evaluate(() => {
+		const title = document.querySelector('.workspace-leaf.mod-active .inline-title')!;
+		const range = document.createRange();
+		range.selectNodeContents(title);
+		const lines = range.getClientRects();
+		const last = lines[lines.length - 1]!;
+		return { right: last.right, middle: last.top + last.height / 2 };
+	});
+	const assertAfterTitle = async (where: string) => {
+		const end = await titleEnd();
+		const box = (await button.boundingBox())!;
+		assert.ok(box.x >= end.right && box.x - end.right < 16, `${where}: the T sits right after the title, got x ${box.x}, the title ends at ${end.right}`);
+		assert.ok(Math.abs(box.y + box.height / 2 - end.middle) < 3, `${where}: the T is on the line of the title`);
+	};
+	const setInlineTitle = async (shown: boolean) => {
+		await page!.evaluate((shown) => (globalThis as any).app.vault.setConfig('showInlineTitle', shown), shown);
+		await page!.waitForTimeout(300);
+	};
+	const inlineTitle = page.locator('.workspace-leaf.mod-active .inline-title');
+	await setInlineTitle(true);
+	for (const mode of ['preview', 'live', 'source'] as const) {
+		await setMode(mode);
+		await scrollToLine(0);
+		await assertAfterTitle(mode);
+		assert.equal(await inlineTitle.textContent(), 'Main', 'the title text stays unchanged');
+		await button.hover();
+		await toc.waitFor({ timeout: 3000 });
+		const titleButtonBox = (await button.boundingBox())!, titleTocBox = (await toc.boundingBox())!;
+		assert.ok(titleTocBox.y >= titleButtonBox.y + titleButtonBox.height && Math.abs(titleTocBox.x - titleButtonBox.x) < 2, `${mode}: the table of contents opens below the T`);
+		assert.deepEqual(await toc.locator('.htoc-toc-item').allTextContents(), ['Guide', 'Setup', 'Install', 'Configure', 'Usage', 'FAQ']);
+		if (mode === 'live') await page.screenshot({ path: `${out}/title-icon.png` });
+		await moveAway();
+	}
+
+	step('the T follows the title when reading view is toggled, the note scrolls, the pane narrows and the note is renamed');
+	await page.evaluate(() => (globalThis as any).app.commands.executeCommandById('markdown:toggle-preview'));
+	await page.waitForTimeout(600);
+	assert.equal(await page.evaluate(() => (globalThis as any).app.workspace.getMostRecentLeaf().view.getMode()), 'preview');
+	// Reading view comes back at its own scroll position.
+	await scrollToLine(0);
+	await assertAfterTitle('toggled to reading view');
+	const unscrolled = (await button.boundingBox())!;
+	await page.evaluate(() => { document.querySelector('.workspace-leaf.mod-active .markdown-preview-view')!.scrollTop = 100; });
+	await page.waitForTimeout(300);
+	assert.ok(Math.abs((await button.boundingBox())!.y - (unscrolled.y - 100)) < 2, 'the T scrolls with the title');
+	// Far from the top, reading view takes the title out of the page; the T must not jump into a corner.
+	await scrollToLine(lineOf('Configure') + 4);
+	assert.equal(await inlineTitle.count(), 0, 'reading view dropped the title far from the top');
+	assert.doesNotMatch((await button.getAttribute('class')) ?? '', /htoc-pos-/, 'the T stays with the title out of sight');
+	await scrollToLine(0);
+	await assertAfterTitle('back at the top');
+	await page.evaluate(() => (globalThis as any).app.workspace.rightSplit.expand());
+	await page.waitForTimeout(800);
+	assert.ok((await button.boundingBox())!.x < unscrolled.x - 20, 'the title moved left in the narrower pane');
+	await assertAfterTitle('narrower pane');
+	await page.evaluate(() => (globalThis as any).app.workspace.rightSplit.collapse());
+	await page.waitForTimeout(800);
+	const rename = (from: string, to: string) => page!.evaluate(async ({ from, to }) => {
+		const g = globalThis as any;
+		await g.app.fileManager.renameFile(g.app.vault.getAbstractFileByPath(from), to);
+	}, { from, to });
+	const shortTitleEnd = (await titleEnd()).right;
+	await rename('Main.md', 'Main with a longer title.md');
+	await page.waitForTimeout(500);
+	assert.ok((await titleEnd()).right > shortTitleEnd + 50, 'the title got longer');
+	await assertAfterTitle('renamed');
+	await rename('Main with a longer title.md', 'Main.md');
+	await page.waitForTimeout(500);
+	await assertAfterTitle('renamed back');
+
+	step('without the inline title, or with the setting off, the T goes back to its corner');
+	const assertInCorner = async (where: string) => {
+		assert.match((await button.getAttribute('class')) ?? '', /htoc-pos-top-right/, where);
+		const box = (await button.boundingBox())!;
+		assert.ok(box.x > leafBox.x + leafBox.width / 2 && box.y < leafBox.y + leafBox.height / 2, `${where}: the T is in the top right of the note`);
+	};
+	await setInlineTitle(false);
+	await assertInCorner('inline title hidden');
+	await setInlineTitle(true);
+	await assertAfterTitle('inline title shown again');
+	await updateSettings({ titleIcon: false });
+	await page.waitForTimeout(200);
+	await assertInCorner('setting off');
+	await button.hover();
+	await toc.waitFor({ timeout: 3000 });
+	const cornerBox = (await button.boundingBox())!, cornerTocBox = (await toc.boundingBox())!;
+	assert.ok(Math.abs(cornerTocBox.x + cornerTocBox.width - (cornerBox.x + cornerBox.width)) < 2, 'the table of contents opens towards the middle again');
+	await moveAway();
+	await updateSettings({ titleIcon: true });
+	await page.waitForTimeout(200);
+	await assertAfterTitle('setting on again');
+	await setInlineTitle(false);
+	await assertInCorner('inline title hidden again');
+
 	step('settings tab renders');
 	assert.equal(await page.evaluate(() => (globalThis as any).app.commands.executeCommandById('app:open-settings')), true);
 	// Obsidian 1.14 opens settings in their own window.
@@ -428,7 +523,7 @@ try {
 	assert.equal(await positionSelect.inputValue(), 'top-right');
 	const stickyToggle = settingRow('Sticky headings').locator('.checkbox-container');
 	assert.match((await stickyToggle.getAttribute('class')) ?? '', /is-enabled/, 'sticky headings are on by default');
-	for (const name of ['Icon in notes', 'Icons on links', 'Icons on links in notes', 'Icons on sticky headings'])
+	for (const name of ['Icon after the note title', 'Icon in notes', 'Icons on links', 'Icons on links in notes', 'Icons on sticky headings'])
 		assert.match((await settingRow(name).locator('.checkbox-container').getAttribute('class')) ?? '', /is-enabled/, `${name} is on by default`);
 	assert.match((await settingRow('Heading numbers in tables of contents').locator('.checkbox-container').getAttribute('class')) ?? '', /is-enabled/, 'heading numbers in tables of contents are on by default');
 	const stickyNumbersToggle = settingRow('Numbers on sticky headings').locator('.checkbox-container');
@@ -444,9 +539,16 @@ try {
 	await positionSelect.selectOption('bottom-left');
 	await page.waitForTimeout(300);
 	assert.match((await button.getAttribute('class')) ?? '', /htoc-pos-bottom-left/, 'the dropdown moves the icon');
+	const titleToggle = settingRow('Icon after the note title').locator('.checkbox-container');
+	await titleToggle.click();
+	await page.waitForTimeout(300);
 	const savedSettings = await page.evaluate(async () => (globalThis as any).app.plugins.plugins['hovered-table-of-content'].loadData());
 	assert.equal(savedSettings.buttonPosition, 'bottom-left', 'declarative dropdown persists');
 	assert.equal(savedSettings.stickyHeadings, false, 'declarative toggle persists');
+	assert.equal(savedSettings.titleIcon, false, 'the icon after the note title toggle persists');
+	await titleToggle.click();
+	await page.waitForTimeout(300);
+	assert.match((await titleToggle.getAttribute('class')) ?? '', /is-enabled/, 'the icon follows the note title again');
 	await stickyToggle.click();
 	await page.waitForTimeout(300);
 	assert.equal(await settingRow('Sticky heading mode').locator('select:not(.is-measuring)').isDisabled(), false, 'dependent settings are enabled again');

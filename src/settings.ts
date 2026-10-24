@@ -10,8 +10,10 @@ export const NUMBER_FORMATS = ['level', 'full'] as const;
 export type NumberFormat = (typeof NUMBER_FORMATS)[number];
 
 export interface HoveredTocSettings {
-	/** Where the T icon sits inside each note. */
+	/** Where the T icon sits inside each note when it does not follow the note title. */
 	buttonPosition: ButtonPosition;
+	/** The T button right after the inline title of each note, while Obsidian shows that title. */
+	titleIcon: boolean;
 	/** Keep the headings of the current section pinned at the top of the note. */
 	stickyHeadings: boolean;
 	/** `prev`: only the closest heading; `path`: the heading with its parents. */
@@ -34,6 +36,7 @@ export interface HoveredTocSettings {
 
 export const DEFAULT_SETTINGS: Readonly<HoveredTocSettings> = Object.freeze({
 	buttonPosition: 'top-right',
+	titleIcon: true,
 	stickyHeadings: true,
 	stickyMode: 'path',
 	noteIcon: true,
@@ -52,10 +55,11 @@ function isOneOf<T extends string>(values: readonly T[], value: unknown): value 
 /** Saved data merged over the defaults; unknown or malformed values fall back to the default. */
 export function normalizeSettings(raw: unknown): HoveredTocSettings {
 	const data = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
-	const flag = (key: 'stickyHeadings' | 'noteIcon' | 'linkIcons' | 'noteLinkIcons' | 'stickyIcons' | 'headingNumbers' | 'stickyNumbers') =>
+	const flag = (key: 'titleIcon' | 'stickyHeadings' | 'noteIcon' | 'linkIcons' | 'noteLinkIcons' | 'stickyIcons' | 'headingNumbers' | 'stickyNumbers') =>
 		typeof data[key] === 'boolean' ? data[key] : DEFAULT_SETTINGS[key];
 	return {
 		buttonPosition: isOneOf(BUTTON_POSITIONS, data.buttonPosition) ? data.buttonPosition : DEFAULT_SETTINGS.buttonPosition,
+		titleIcon: flag('titleIcon'),
 		stickyHeadings: flag('stickyHeadings'),
 		stickyMode: isOneOf(STICKY_MODES, data.stickyMode) ? data.stickyMode : DEFAULT_SETTINGS.stickyMode,
 		noteIcon: flag('noteIcon'),

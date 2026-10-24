@@ -24,6 +24,10 @@ describe('settings', () => {
 		expect(DEFAULT_SETTINGS.stickyIcons).toBe(true);
 	});
 
+	test('the T in a note follows the note title by default', () => {
+		expect(DEFAULT_SETTINGS.titleIcon).toBe(true);
+	});
+
 	test('tables of contents are numbered within the section by default, sticky headings are not', () => {
 		expect(DEFAULT_SETTINGS.headingNumbers).toBe(true);
 		expect(DEFAULT_SETTINGS.stickyNumbers).toBe(false);
@@ -59,9 +63,9 @@ describe('settings', () => {
 	});
 
 	test('keeps valid saved values and repairs invalid ones', () => {
-		const saved = { buttonPosition: 'bottom-center', stickyHeadings: false, stickyMode: 'prev', noteIcon: false, linkIcons: false, noteLinkIcons: false, stickyIcons: false, headingNumbers: false, stickyNumbers: true, numberFormat: 'full' };
+		const saved = { buttonPosition: 'bottom-center', titleIcon: false, stickyHeadings: false, stickyMode: 'prev', noteIcon: false, linkIcons: false, noteLinkIcons: false, stickyIcons: false, headingNumbers: false, stickyNumbers: true, numberFormat: 'full' };
 		expect(normalizeSettings(saved)).toEqual(saved);
-		expect(normalizeSettings({ buttonPosition: 'middle', stickyHeadings: 'yes', stickyMode: 1, noteIcon: 0, linkIcons: 'no', noteLinkIcons: 1, stickyIcons: null, headingNumbers: 'on', stickyNumbers: 1, numberFormat: 'roman' })).toEqual(DEFAULT_SETTINGS);
+		expect(normalizeSettings({ buttonPosition: 'middle', titleIcon: 'yes', stickyHeadings: 'yes', stickyMode: 1, noteIcon: 0, linkIcons: 'no', noteLinkIcons: 1, stickyIcons: null, headingNumbers: 'on', stickyNumbers: 1, numberFormat: 'roman' })).toEqual(DEFAULT_SETTINGS);
 		expect(normalizeSettings(null)).toEqual(DEFAULT_SETTINGS);
 		expect(normalizeSettings(undefined)).toEqual(DEFAULT_SETTINGS);
 	});

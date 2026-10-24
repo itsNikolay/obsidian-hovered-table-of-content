@@ -185,6 +185,8 @@ export default class HoveredTocPlugin extends Plugin {
 			const decoration = this.decorations.get(view);
 			if (!decoration) this.decorations.set(view, new ViewDecoration(this, view));
 			else if (decoration.path !== view.file?.path) decoration.apply();
+			// Switching between reading view and the editor moves the inline title.
+			else decoration.placeButton();
 		}
 	}
 

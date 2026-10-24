@@ -46,7 +46,9 @@ export class HoveredTocSettingTab extends PluginSettingTab {
 		const stickyDisabled = () => !this.plugin.settings.stickyHeadings;
 		const numbersDisabled = () => !hasNumbers(this.plugin.settings);
 		return [
-			{ name: 'Icon position', desc: 'Where the table of contents icon sits in each note.',
+			{ name: 'Icon after the note title', desc: 'Show the table of contents icon right after the inline title of each note.',
+				control: { type: 'toggle', key: 'titleIcon', defaultValue: DEFAULT_SETTINGS.titleIcon, disabled: () => !this.plugin.settings.noteIcon } },
+			{ name: 'Icon position', desc: 'Where the table of contents icon sits in each note when it is not after the note title.',
 				control: { type: 'dropdown', key: 'buttonPosition', options: POSITION_LABELS, defaultValue: DEFAULT_SETTINGS.buttonPosition } },
 			{ name: 'Icon in notes', desc: 'Show the table of contents icon in each note.',
 				control: { type: 'toggle', key: 'noteIcon', defaultValue: DEFAULT_SETTINGS.noteIcon } },
@@ -85,18 +87,7 @@ export class HoveredTocSettingTab extends PluginSettingTab {
 		containerEl.empty();
 		const { settings } = this.plugin;
 
-		new Setting(containerEl)
-			.setName('Icon position')
-			.setDesc('Where the table of contents icon sits in each note.')
-			.addDropdown((dropdown) => {
-				for (const position of BUTTON_POSITIONS) dropdown.addOption(position, POSITION_LABELS[position]);
-				dropdown.setValue(settings.buttonPosition).onChange(async (value) => {
-					settings.buttonPosition = value as ButtonPosition;
-					await this.plugin.saveSettings();
-				});
-			});
-
-		const iconToggle = (name: string, desc: string, key: 'noteIcon' | 'linkIcons' | 'noteLinkIcons' | 'stickyIcons') =>
+		const iconToggle = (name: string, desc: string, key: 'titleIcon' | 'noteIcon' | 'linkIcons' | 'noteLinkIcons' | 'stickyIcons') =>
 			new Setting(containerEl)
 				.setName(name)
 				.setDesc(desc)
@@ -106,6 +97,19 @@ export class HoveredTocSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					}),
 				);
+		iconToggle('Icon after the note title', 'Show the table of contents icon right after the inline title of each note.', 'titleIcon');
+
+		new Setting(containerEl)
+			.setName('Icon position')
+			.setDesc('Where the table of contents icon sits in each note when it is not after the note title.')
+			.addDropdown((dropdown) => {
+				for (const position of BUTTON_POSITIONS) dropdown.addOption(position, POSITION_LABELS[position]);
+				dropdown.setValue(settings.buttonPosition).onChange(async (value) => {
+					settings.buttonPosition = value as ButtonPosition;
+					await this.plugin.saveSettings();
+				});
+			});
+
 		iconToggle('Icon in notes', 'Show the table of contents icon in each note.', 'noteIcon');
 		iconToggle('Icons on links', 'Show a table of contents icon next to links in previews and in page previews of notes.', 'linkIcons');
 		iconToggle('Icons on links in notes', 'Show a table of contents icon next to links to other notes in reading view and live preview.', 'noteLinkIcons');

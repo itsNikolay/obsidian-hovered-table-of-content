@@ -19,7 +19,7 @@ await mkdir(profile, { recursive: true });
 await mkdir(out, { recursive: true });
 for (const file of ['main.js', 'manifest.json', 'styles.css']) await copyFile(file, `${pluginDir}/${file}`);
 await writeFile(`${vault}/.obsidian/community-plugins.json`, JSON.stringify([PLUGIN_ID]));
-await writeFile(`${vault}/.obsidian/app.json`, JSON.stringify({ safeMode: false, livePreview: true, showInlineTitle: false }));
+await writeFile(`${vault}/.obsidian/app.json`, JSON.stringify({ safeMode: false, livePreview: true, showInlineTitle: true }));
 await writeFile(`${vault}/.obsidian/appearance.json`, JSON.stringify({ theme: 'obsidian' }));
 await writeFile(`${profile}/obsidian.json`, JSON.stringify({ vaults: { demo: { path: vault, ts: Date.now(), open: true } } }));
 
@@ -29,7 +29,8 @@ const prose = (topic: string, count: number) => Array.from({ length: count }, (_
 	`Small, frequent updates are easier to follow than one large batch (note ${i + 1}).`,
 ].join(' ')).join('\n\n');
 const handbook = [
-	'# Project Handbook',
+	// The inline title already shows the note name.
+	'# Overview',
 	'Everything a new teammate needs in one note: how to get set up, how work flows and how we ship.',
 	prose('onboarding', 2),
 	'## Getting started',
@@ -168,7 +169,7 @@ try {
 		'-pix_fmt', 'yuv444p', '/tmp/demo.mp4'], { stdio: ['pipe', 'inherit', 'inherit'] });
 	await pause(1200);
 
-	await caption('Hover the T icon to see the table of contents');
+	await caption('Hover the T after the note title to see the table of contents');
 	await glideTo(button, 900);
 	const toc = page.locator('.htoc-toc').first();
 	await toc.waitFor({ timeout: 3000 });

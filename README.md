@@ -1,6 +1,6 @@
 # Hovered Table of Content — Obsidian table of contents plugin
 
-![Hovering the T icon shows the table of contents, section previews, linked notes, the T on links in a note and sticky headings](docs/demo.gif)
+![Hovering the T icon after the note title shows the table of contents, section previews, linked notes, the T on links in a note and sticky headings](docs/demo.gif)
 
 [![Latest release](https://img.shields.io/github/v/release/itsNikolay/obsidian-hovered-table-of-content?label=release)](https://github.com/itsNikolay/obsidian-hovered-table-of-content/releases/latest)
 [![CI](https://github.com/itsNikolay/obsidian-hovered-table-of-content/actions/workflows/ci.yml/badge.svg)](https://github.com/itsNikolay/obsidian-hovered-table-of-content/actions/workflows/ci.yml)
@@ -20,7 +20,7 @@ Obsidian's core Outline view lives in a sidebar and only shows the active note. 
 
 ## Features
 
-- **T icon.** Every note gets a small square **T** button. Hover over it to see the note's table of contents in a popup.
+- **T icon.** Every note gets a small square **T** button right after its title. Hover over it to see the note's table of contents in a popup.
 - **Section previews.** Hover over a heading in the table of contents to preview that section: the heading, its text and its subsections. Click the heading to jump to it (Ctrl/Cmd-click opens it in a new tab).
 - **Previews of linked notes.** Hover over a link inside a preview to see the linked note in Obsidian's page preview. Every link to another note also gets its own **T** icon. Hover over it to see the linked note's table of contents, which previews its sections in turn.
 - **T on links in notes.** Every link to another note in the note itself gets a **T** right after it, in Reading view and Live Preview. Hover over it to see the linked note's table of contents.
@@ -56,7 +56,8 @@ Requires Obsidian 1.5.7 or later.
 
 | Setting | Default | |
 | --- | --- | --- |
-| Icon position | Top right | Top left, top center, top right, bottom left, bottom center or bottom right of the note. The popup opens towards the middle of the note. |
+| Icon after the note title | On | Shows the **T** right after the inline title of the note; it scrolls with the title. When Obsidian hides the inline title (**Settings → Appearance → Show inline title**), the **T** sits at the icon position. |
+| Icon position | Top right | Where the **T** sits when it is not after the note title: top left, top center, top right, bottom left, bottom center or bottom right of the note. The popup opens towards the middle of the note. |
 | Icon in notes | On | Shows the **T** button in each note. |
 | Icons on links | On | Shows a **T** next to links in previews and in Obsidian's page previews of notes. |
 | Icons on links in notes | On | Shows a **T** next to links to other notes in the note itself, in Reading view and Live Preview. |

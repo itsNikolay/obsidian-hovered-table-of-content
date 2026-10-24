@@ -59,6 +59,20 @@
 .htoc-pos-bottom-center { bottom: 32px; left: 50%; transform: translateX(-50%); }
 .htoc-pos-bottom-right { bottom: 32px; right: 24px; }
 
+/* Right after the inline title: the plugin measures its last line; the button scrolls with the note. */
+.htoc-button.htoc-after-title {
+	top: var(--htoc-title-top);
+	left: var(--htoc-title-left);
+	width: 22px;
+	height: 22px;
+	margin-inline-start: 10px;
+	font-size: 12px;
+	box-shadow: none;
+	transform: translateY(-50%);
+	/* Under the sticky headings when the note scrolls. */
+	z-index: 1;
+}
+
 /* The T button in Obsidian page previews, left of the popover's own expand button. */
 .popover.hover-popover > .htoc-preview-button {
 	top: 8px;

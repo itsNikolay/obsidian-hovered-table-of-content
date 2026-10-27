@@ -160,12 +160,15 @@ export class TocController {
 		return icon;
 	}
 
-	/** Adds a T icon after each link to another note in a rendered note; links that already have one are skipped. */
-	decorateNoteLinks(container: HTMLElement, sourcePath: string): void {
+	/**
+	 * Adds a T icon after each link to another note in a rendered note; links that already have one are skipped.
+	 * `onOpen` is called with each table of contents that opens from the icons.
+	 */
+	decorateNoteLinks(container: HTMLElement, sourcePath: string, className = 'htoc-note-link-toc', onOpen?: (popup: Popup) => void): void {
 		for (const link of Array.from(container.querySelectorAll<HTMLAnchorElement>('a.internal-link'))) {
 			if (link.nextElementSibling?.classList.contains('htoc-icon') || link.closest('.htoc-popup')) continue;
 			const target = this.host.resolveLink(link.dataset.href ?? link.getAttribute('href') ?? '', sourcePath);
-			if (target) link.after(this.createLinkIcon(container.ownerDocument, 'htoc-note-link-toc', target));
+			if (target) link.after(this.createLinkIcon(container.ownerDocument, className, target, onOpen));
 		}
 	}
 

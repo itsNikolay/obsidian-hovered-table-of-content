@@ -263,6 +263,25 @@ try {
 	await page.waitForTimeout(1000);
 	assert.equal(await page.locator('.hover-popover').count(), 0, 'the page preview closes with the popups');
 
+	step('links in page previews get a T with the linked note table of contents');
+	await page.locator('.workspace-leaf.mod-active .markdown-reading-view a.internal-link', { hasText: 'Other' }).first().hover();
+	await notePreview.waitFor({ timeout: 5000 });
+	const previewLinkIcon = notePreview.locator('a.internal-link + .htoc-link-toc');
+	await previewLinkIcon.waitFor({ timeout: 3000 });
+	assert.equal(await previewLinkIcon.evaluate((el) => el.previousElementSibling?.textContent), 'Third', 'the T sits right after the link');
+	await previewLinkIcon.hover();
+	const linkedToc = page.locator('.htoc-toc', { hasText: 'Third note' });
+	await linkedToc.waitFor({ timeout: 3000 });
+	assert.deepEqual(await linkedToc.locator('.htoc-toc-item').allTextContents(), ['Third note', 'Third part']);
+	await linkedToc.locator('.htoc-toc-item', { hasText: 'Third part' }).hover();
+	await page.locator('.htoc-preview', { hasText: 'Third details' }).waitFor({ timeout: 3000 });
+	await page.waitForTimeout(1200);
+	assert.equal(await notePreview.isVisible(), true, 'the page preview stays open while the table of contents of its link is used');
+	await page.screenshot({ path: `${out}/page-preview-link-toc.png` });
+	await moveAway();
+	await page.waitForTimeout(1000);
+	assert.equal(await page.locator('.hover-popover').count(), 0, 'the page preview closes with the popups');
+
 	step('the T next to a link keeps the page preview of that link open');
 	const pagePreviewOf = (text: string) => page!.locator('.hover-popover', { hasText: text });
 	await button.hover();
@@ -422,6 +441,16 @@ try {
 	await updateSettings({ linkIcons: true, stickyIcons: true });
 	await page.waitForTimeout(200);
 	assert.ok(await page.locator('.workspace-leaf.mod-active .htoc-sticky-toc').count() > 0, 'sticky T icons are back');
+	await updateSettings({ linkIcons: false });
+	await setMode('preview');
+	await scrollToLine(lineOf('Setup'));
+	await page.locator('.workspace-leaf.mod-active .markdown-reading-view a.internal-link', { hasText: 'Other' }).first().hover();
+	await page.locator('.hover-popover', { hasText: 'Other details' }).waitFor({ timeout: 5000 });
+	await page.waitForTimeout(500);
+	assert.equal(await page.locator('.hover-popover .htoc-icon').count(), 0, 'no T in page previews');
+	await page.mouse.move(700, 990);
+	await page.waitForTimeout(1500);
+	await updateSettings({ linkIcons: true });
 	for (const mode of ['preview', 'live'] as const) {
 		await setMode(mode);
 		await scrollToLine(lineOf('Setup'));

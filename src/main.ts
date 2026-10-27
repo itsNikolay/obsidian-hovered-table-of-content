@@ -13,7 +13,7 @@ import {
 import type { Heading } from './headings';
 import { normalizeSettings, popoverPlacement, tocNumberFormat, type HoveredTocSettings } from './settings';
 import { HoveredTocSettingTab } from './settings-tab';
-import { PopupManager } from './ui/popup';
+import { PopupManager, type Popup } from './ui/popup';
 import { TocController, createIcon, type TocHost } from './ui/toc';
 import { ViewDecoration, noteLinkIcons } from './view-decoration';
 
@@ -56,8 +56,8 @@ export default class HoveredTocPlugin extends Plugin {
 	/** One popup layer per window, so popups open in the window of their trigger. */
 	private layers = new Map<Document, { popups: PopupManager; toc: TocController }>();
 	private decorations = new Map<MarkdownView, ViewDecoration>();
-	/** T buttons added to Obsidian page previews. */
-	private previewButtons = new Set<HTMLElement>();
+	/** Each removes the T icons added to an open Obsidian page preview. */
+	private undecoratePreviews = new Set<() => void>();
 	private watchedLinks = new WeakSet<HTMLElement>();
 	private handledPreviews = new WeakSet<HTMLElement>();
 
@@ -86,18 +86,14 @@ export default class HoveredTocPlugin extends Plugin {
 		this.decorations.clear();
 		for (const layer of this.layers.values()) layer.popups.destroy();
 		this.layers.clear();
-		for (const button of this.previewButtons) button.remove();
-		this.previewButtons.clear();
+		this.undecorateAllPreviews();
 	}
 
 	async saveSettings() {
 		await this.saveData(this.settings);
 		for (const decoration of this.decorations.values()) decoration.apply();
 		this.app.workspace.updateOptions();
-		if (!this.settings.linkIcons) {
-			for (const button of this.previewButtons) button.remove();
-			this.previewButtons.clear();
-		}
+		if (!this.settings.linkIcons) this.undecorateAllPreviews();
 	}
 
 	getHeadings(path: string | null | undefined): Heading[] {
@@ -143,17 +139,40 @@ export default class HoveredTocPlugin extends Plugin {
 		});
 	}
 
+	/** A T button with the table of contents of the previewed note, and a T after each link to another note in the preview. */
 	private decoratePreview(popover: Popover, path: string) {
 		const { hoverEl } = popover;
 		const doc = hoverEl.ownerDocument;
+		const toc = this.tocFor(doc);
+		// The page preview would close once the pointer moves to the table of contents.
+		const keepPreview = (popup: Popup) => popup.onClose(keepOpen(popover));
 		const button = createIcon(doc, 'htoc-button htoc-preview-button', 'Table of contents');
 		hoverEl.append(button);
-		this.previewButtons.add(button);
-		popover.register(() => this.previewButtons.delete(button));
-		// The page preview would close once the pointer moves to the table of contents.
-		this.tocFor(doc).attachToc(button, { path, headings: () => this.getHeadings(path) }, popoverPlacement('top-right'), (popup) =>
-			popup.onClose(keepOpen(popover)),
-		);
+		toc.attachToc(button, { path, headings: () => this.getHeadings(path) }, popoverPlacement('top-right'), keepPreview);
+
+		// The preview renders the note after it is shown, and again when the note changes.
+		let frame: number | null = null;
+		const decorateLinks = () => {
+			frame = null;
+			toc.decorateNoteLinks(hoverEl, path, 'htoc-link-toc', keepPreview);
+		};
+		decorateLinks();
+		const observer = new MutationObserver(() => {
+			frame ??= doc.win.requestAnimationFrame(decorateLinks);
+		});
+		observer.observe(hoverEl, { childList: true, subtree: true });
+		const undecorate = () => {
+			this.undecoratePreviews.delete(undecorate);
+			observer.disconnect();
+			if (frame !== null) doc.win.cancelAnimationFrame(frame);
+			for (const icon of Array.from(hoverEl.querySelectorAll('.htoc-preview-button, .htoc-link-toc'))) icon.remove();
+		};
+		this.undecoratePreviews.add(undecorate);
+		popover.register(undecorate);
+	}
+
+	private undecorateAllPreviews() {
+		for (const undecorate of [...this.undecoratePreviews]) undecorate();
 	}
 
 	/** Calls back with the page preview that `parent` shows for `targetEl` once it is on screen, or null if it never shows. */

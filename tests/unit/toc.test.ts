@@ -327,6 +327,18 @@ describe('TocController', () => {
 			expect(q('.htoc-note-link-toc')).toHaveLength(1);
 		});
 
+		test('the icons can get another class and report the tables of contents they open', async () => {
+			const el = note();
+			const opened = vi.fn<(popup: Popup) => void>();
+			toc.decorateNoteLinks(el, 'Main.md', 'htoc-link-toc', opened);
+			expect(q('.htoc-note-link-toc')).toHaveLength(0);
+			const icons = q('.htoc-link-toc');
+			expect(icons).toHaveLength(1);
+			await hover(icons[0]!);
+			expect(opened).toHaveBeenCalledOnce();
+			expect(opened.mock.calls[0]![0].el).toBe(q('.htoc-toc')[0]);
+		});
+
 		test('links inside our own previews are left to the preview', () => {
 			const el = note();
 			el.classList.add('htoc-popup');

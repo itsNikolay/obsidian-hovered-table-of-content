@@ -44,6 +44,9 @@ await writeFile(`${vault}/Other.md`, '# Other note\n\nOther intro.\n\n## Other p
 await writeFile(`${vault}/Third.md`, '# Third note\n\nThird intro.\n\n## Third part\n\nThird details.\n');
 await writeFile(`${vault}/Long.md`, Array.from({ length: 50 }, (_, i) => `## Part ${i + 1}\n\nPart ${i + 1} text.`).join('\n\n') + '\n');
 await writeFile(`${vault}/Notes.base`, 'views:\n  - type: table\n    name: Table\n');
+await mkdir(`${vault}/Maps`, { recursive: true });
+await writeFile(`${vault}/Maps/Map in folder.md`, '---\ntags:\n  - map\n---\n# Folder map\n\nFolder intro.\n\n## Folder part\n\nFolder details.\n');
+await writeFile(`${vault}/Maps.md`, '```base\nfilters:\n  and:\n    - file.hasTag("map")\nviews:\n  - type: table\n    name: Table\n```\n');
 const lineOf = (heading: string) => main.split('\n').findIndex((l) => l.replace(/^#+ /, '') === heading && l.startsWith('#'));
 
 const errors: string[] = [];
@@ -339,6 +342,28 @@ try {
 	await basePreviewToc.waitFor({ timeout: 3000 });
 	assert.deepEqual(await basePreviewToc.locator('.htoc-toc-item').allTextContents(), ['Other note', 'Other part']);
 	await page.screenshot({ path: `${out}/bases-page-preview.png` });
+	await moveAway();
+	await page.waitForTimeout(1000);
+	assert.equal(await page.locator('.hover-popover').count(), 0, 'the page preview closes with the popups');
+
+	step('a page preview of a note in a folder from a base embedded in a note gets a T');
+	// Bases give no source path for their links.
+	await page.evaluate(async () => {
+		const g = globalThis as any;
+		await g.app.workspace.getMostRecentLeaf().setViewState({ type: 'markdown', state: { file: 'Maps.md', mode: 'source', source: false } });
+	});
+	const embeddedBaseLink = page.locator('.workspace-leaf.mod-active .bases-embed .internal-link', { hasText: 'Map in folder' });
+	await embeddedBaseLink.waitFor({ timeout: 5000 });
+	await page.keyboard.down('Control');
+	await embeddedBaseLink.hover();
+	const folderPreview = pagePreviewOf('Folder intro');
+	await folderPreview.waitFor({ timeout: 5000 });
+	await page.keyboard.up('Control');
+	await folderPreview.locator('.htoc-preview-button').hover({ timeout: 3000 });
+	const folderPreviewToc = page.locator('.htoc-toc').first();
+	await folderPreviewToc.waitFor({ timeout: 3000 });
+	assert.deepEqual(await folderPreviewToc.locator('.htoc-toc-item').allTextContents(), ['Folder map', 'Folder part']);
+	await page.screenshot({ path: `${out}/embedded-base-page-preview.png` });
 	await moveAway();
 	await page.waitForTimeout(1000);
 	assert.equal(await page.locator('.hover-popover').count(), 0, 'the page preview closes with the popups');

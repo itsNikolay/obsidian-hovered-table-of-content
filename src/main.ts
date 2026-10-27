@@ -36,7 +36,8 @@ interface HoverLinkEvent {
 	hoverParent: HoverParent;
 	targetEl?: HTMLElement | null;
 	linktext: string;
-	sourcePath: string;
+	/** Missing for links in Bases. */
+	sourcePath?: string;
 }
 
 const PREVIEW_WAIT = 3000;
@@ -134,8 +135,9 @@ export default class HoveredTocPlugin extends Plugin {
 			if (!popover || this.handledPreviews.has(popover.hoverEl)) return;
 			this.handledPreviews.add(popover.hoverEl);
 			this.layerFor(targetEl.doc).popups.popupOf(targetEl)?.hold(popover.hoverEl);
-			const target = this.app.metadataCache.getFirstLinkpathDest(getLinkpath(linktext), sourcePath);
-			if (this.settings.linkIcons && target instanceof TFile && target.extension === 'md') this.decoratePreview(popover, target.path);
+			// Without a source path, Obsidian throws on links to notes in folders.
+			const path = this.resolveLink(linktext, sourcePath ?? '');
+			if (this.settings.linkIcons && path) this.decoratePreview(popover, path);
 		});
 	}
 

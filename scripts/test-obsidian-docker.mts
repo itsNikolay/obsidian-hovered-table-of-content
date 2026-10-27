@@ -182,6 +182,26 @@ try {
 	await page.screenshot({ path: `${out}/nested-preview.png` });
 	await moveAway();
 
+	step('moving to another heading highlights only that heading, also before its preview opens');
+	await button.hover();
+	await toc.waitFor({ timeout: 3000 });
+	await toc.locator('.htoc-toc-item', { hasText: 'Setup' }).hover();
+	await preview.waitFor({ timeout: 3000 });
+	const highlight = () => toc.locator('.htoc-toc-item').evaluateAll((items) => {
+		const plain = getComputedStyle(items.find((item) => item.textContent === 'FAQ')!).backgroundColor;
+		return {
+			active: items.filter((item) => item.classList.contains('is-active')).map((item) => item.textContent),
+			highlighted: items.filter((item) => getComputedStyle(item).backgroundColor !== plain).map((item) => item.textContent),
+		};
+	});
+	await toc.locator('.htoc-toc-item', { hasText: 'Usage' }).hover();
+	const moved = await highlight();
+	assert.deepEqual(moved.active, ['Setup'], 'checked while the preview of the previous heading is still open');
+	assert.deepEqual(moved.highlighted, ['Usage'], 'only the hovered heading is highlighted');
+	await page.waitForTimeout(400);
+	assert.deepEqual(await highlight(), { active: ['Usage'], highlighted: ['Usage'] }, 'the hovered heading stays highlighted once its preview opens');
+	await moveAway();
+
 	step('links in a section preview show the page preview of the linked note, which has its own T');
 	await button.hover();
 	await toc.waitFor({ timeout: 3000 });

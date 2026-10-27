@@ -157,9 +157,12 @@
 	font-weight: var(--font-semibold);
 }
 
-/* The heading whose section preview is open stays highlighted while the pointer is in the preview. */
+/*
+ * The heading whose section preview is open stays highlighted while the pointer is in the preview.
+ * Once the pointer is back on the list, only the hovered heading is highlighted, also before its preview opens.
+ */
 .htoc-toc-item:hover,
-.htoc-toc-item.is-active {
+.htoc-toc-list:not(:hover) > .htoc-toc-item.is-active {
 	background-color: var(--background-modifier-hover);
 }
 

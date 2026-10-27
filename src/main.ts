@@ -175,14 +175,18 @@ export default class HoveredTocPlugin extends Plugin {
 		for (const undecorate of [...this.undecoratePreviews]) undecorate();
 	}
 
-	/** Calls back with the page preview that `parent` shows for `targetEl` once it is on screen, or null if it never shows. */
+	/**
+	 * Calls back with the page preview that `parent` shows for `targetEl` once it is on screen, or null if it never shows.
+	 * A preview that needs Ctrl/Cmd (as in Bases) shows only once the key is pressed, so it is awaited while the pointer stays on the link.
+	 */
 	private whenPreviewShown(parent: HoverParent, targetEl: HTMLElement, callback: (popover: Popover | null) => void) {
-		const started = Date.now();
+		let deadline = Date.now() + PREVIEW_WAIT;
 		const check = () => {
 			const popover: Popover | null = parent.hoverPopover;
 			const forTarget = popover && (popover.targetEl === undefined || popover.targetEl === targetEl);
+			if (targetEl.matches(':hover')) deadline = Date.now() + PREVIEW_WAIT;
 			if (forTarget && popover.hoverEl.isConnected) callback(popover);
-			else if (Date.now() - started < PREVIEW_WAIT) targetEl.win.setTimeout(check, 100);
+			else if (Date.now() < deadline) targetEl.win.setTimeout(check, 100);
 			else callback(null);
 		};
 		check();

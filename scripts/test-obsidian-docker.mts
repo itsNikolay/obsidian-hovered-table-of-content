@@ -43,6 +43,7 @@ await writeFile(`${vault}/Main.md`, main + '\n');
 await writeFile(`${vault}/Other.md`, '# Other note\n\nOther intro.\n\n## Other part\n\nOther details live here. See [[Third]].\n');
 await writeFile(`${vault}/Third.md`, '# Third note\n\nThird intro.\n\n## Third part\n\nThird details.\n');
 await writeFile(`${vault}/Long.md`, Array.from({ length: 50 }, (_, i) => `## Part ${i + 1}\n\nPart ${i + 1} text.`).join('\n\n') + '\n');
+await writeFile(`${vault}/Notes.base`, 'views:\n  - type: table\n    name: Table\n');
 const lineOf = (heading: string) => main.split('\n').findIndex((l) => l.replace(/^#+ /, '') === heading && l.startsWith('#'));
 
 const errors: string[] = [];
@@ -312,6 +313,36 @@ try {
 	await moveAway();
 	await page.waitForTimeout(1500);
 	assert.equal(await page.locator('.hover-popover').count(), 0, 'the page previews close with the popups');
+
+	step('a page preview from Bases opened with Ctrl long after the pointer came gets a T');
+	await page.evaluate(async () => {
+		const g = globalThis as any;
+		await g.app.workspace.getMostRecentLeaf().openFile(g.app.vault.getAbstractFileByPath('Notes.base'));
+	});
+	const baseLink = page.locator('.workspace-leaf.mod-active .internal-link', { hasText: 'Other' }).first();
+	await baseLink.waitFor({ timeout: 5000 });
+	await baseLink.hover();
+	await page.waitForTimeout(500);
+	assert.equal(await page.locator('.hover-popover').count(), 0, 'Bases show page previews only with Ctrl');
+	// Obsidian waits for Ctrl while the pointer keeps moving over the link.
+	const baseLinkBox = (await baseLink.boundingBox())!;
+	for (let i = 0; i < 8; i++) {
+		await page.mouse.move(baseLinkBox.x + 3 + (i % 2) * 4, baseLinkBox.y + baseLinkBox.height / 2);
+		await page.waitForTimeout(500);
+	}
+	await page.keyboard.down('Control');
+	const basePreview = pagePreviewOf('Other intro');
+	await basePreview.waitFor({ timeout: 5000 });
+	await page.keyboard.up('Control');
+	await basePreview.locator('.htoc-preview-button').hover({ timeout: 3000 });
+	const basePreviewToc = page.locator('.htoc-toc').first();
+	await basePreviewToc.waitFor({ timeout: 3000 });
+	assert.deepEqual(await basePreviewToc.locator('.htoc-toc-item').allTextContents(), ['Other note', 'Other part']);
+	await page.screenshot({ path: `${out}/bases-page-preview.png` });
+	await moveAway();
+	await page.waitForTimeout(1000);
+	assert.equal(await page.locator('.hover-popover').count(), 0, 'the page preview closes with the popups');
+	await setMode('preview');
 
 	step('clicking an item scrolls to the heading');
 	await button.hover();

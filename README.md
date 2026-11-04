@@ -79,6 +79,8 @@ The tests run in Docker, including end-to-end checks against the real Linux Obsi
 
 ```sh
 npm run docker:test    # lint, typecheck, unit tests (vitest + jsdom), build
+npm run docker:test -- tests/unit/toc.test.ts -t 'clicking the title' # focused unit run
+npm run docker:e2e -- --scenario title-preview # focused native preview scenario
 npm run docker:check   # all of the above + end-to-end tests in real Obsidian
 npm run docker:e2e     # only the end-to-end tests in real Obsidian
 npm run docker:demo    # re-record docs/demo.gif in real Obsidian
@@ -86,6 +88,8 @@ npm run docker:demo:title # record artifacts/docker/toc-title-preview.mp4
 ```
 
 The end-to-end run uses a synthetic vault created inside the container (`--network=none`). Screenshots and `report.json` are written to `artifacts/docker/`.
+
+For DSH delegation, run `npm run agent:preflight` from a shell with `DEEPSEEK_API_KEY` exported, then `npm run agent:dsh -- 'Implement the approved ticket'`. Docker validation belongs to the coordinator. See [agent development workflow](docs/agents/development.md) for the launch and UI evidence rules.
 
 Without Docker, use Node 22.13 or later: `npm ci && npm run check`.
 

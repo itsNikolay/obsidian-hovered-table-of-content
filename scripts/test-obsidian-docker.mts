@@ -1,6 +1,7 @@
 // End-to-end checks against the real Linux Obsidian app inside Docker (see docker/entrypoint.sh).
 // Uses a synthetic, disposable vault; never touches the host Obsidian or a personal vault.
 import { chromium, type Browser, type Locator, type Page } from 'playwright';
+import { isFullyInViewport } from './ui-visibility.mts';
 import type { ChildProcessByStdio } from 'node:child_process';
 import type { Readable } from 'node:stream';
 import { mkdir, writeFile, copyFile, readFile } from 'node:fs/promises';
@@ -10,6 +11,10 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 if (process.env.HTOC_DOCKER !== '1') throw new Error('Run this through npm run docker:check. Host Obsidian is never launched.');
+
+const args = process.argv.slice(2);
+const scenario = args.length === 0 ? 'full' : args.length === 2 && args[0] === '--scenario' ? args[1] : undefined;
+if (scenario !== 'full' && scenario !== 'title-preview') throw new Error('Unknown E2E scenario. Use full or title-preview.');
 
 const PLUGIN_ID = 'hovered-table-of-content';
 const vault = '/tmp/htoc-vault', profile = join(homedir(), '.config', 'obsidian'), out = '/artifacts';
@@ -138,7 +143,7 @@ async function setPagePreviewEnabled(enabled: boolean) {
 	await page!.waitForTimeout(300);
 }
 
-try {
+async function runChecks() {
 	app = spawn(process.env.OBSIDIAN_EXECUTABLE || '/opt/squashfs-root/obsidian', ['--no-sandbox', '--disable-gpu',
 		'--remote-debugging-port=9222', `--user-data-dir=${profile}`], { stdio: ['ignore', 'ignore', 'pipe'] });
 	let appLog = '';
@@ -223,6 +228,9 @@ try {
 	assert.ok(afterScroll > beforeScroll, `the page preview scrolls, got ${beforeScroll} -> ${afterScroll}`);
 	await previewScroller.evaluate((el) => el.scrollTo(0, el.scrollHeight));
 	await notePagePreview.getByText('FAQ paragraph 14. Synthetic text for scrolling.', { exact: true }).waitFor({ timeout: 5000 });
+	await previewScroller.evaluate((el) => el.scrollTo(0, el.scrollHeight));
+	await page.waitForTimeout(200);
+	assert.equal(await isFullyInViewport(notePagePreview.getByText('FAQ paragraph 14. Synthetic text for scrolling.', { exact: true }), previewScroller), true, 'the last paragraph is inside the preview viewport');
 	assert.equal(await toc.isVisible(), true, 'the entire note remains accessible beyond its initial rendered section');
 	await previewScroller.evaluate((el) => el.scrollTo(0, 500));
 	await page.waitForTimeout(300);
@@ -285,6 +293,11 @@ try {
 	await setPagePreviewEnabled(true);
 	await button.hover();
 	await toc.waitFor({ timeout: 3000 });
+
+	if (scenario === 'title-preview') {
+		await moveAway();
+		return;
+	}
 
 	step('hovering an item previews its section, links inside get their own T icon');
 	await toc.locator('.htoc-toc-item', { hasText: 'Setup' }).hover();
@@ -998,10 +1011,14 @@ try {
 	assert.equal(await formatSelect.isDisabled(), false, 'the number format is enabled again');
 	await settingsPage.close();
 
+}
+
+try {
+	await runChecks();
 	assert.equal(errors.length, 0, errors.join('\n'));
 	await writeFile(`${out}/report.json`, JSON.stringify({ obsidian: process.env.OBSIDIAN_VERSION,
-		plugin: JSON.parse(await readFile('manifest.json', 'utf8')).version, realApp: true, errors }, null, 2));
-	console.log('Real Obsidian end-to-end checks passed');
+		plugin: JSON.parse(await readFile('manifest.json', 'utf8')).version, realApp: true, scenario, errors }, null, 2));
+	console.log(`Real Obsidian end-to-end checks passed (${scenario})`);
 } catch (error) {
 	if (page) await page.screenshot({ path: `${out}/failure.png` }).catch(() => {});
 	failure = error;

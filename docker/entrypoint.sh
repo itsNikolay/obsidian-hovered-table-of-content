@@ -6,6 +6,12 @@
 # demo-title: build, then record the focused linked-note TOC title preview MP4.
 set -euo pipefail
 mode="${1:-check}"
+[ "$#" -gt 0 ] && shift
+# A filtered unit run skips unrelated lint, build and tests. The default stays complete.
+if [ "$mode" = "unit" ] && [ "$#" -gt 0 ]; then
+  npx vitest run "$@"
+  exit 0
+fi
 if [ "$mode" = "e2e" ] || [ "$mode" = "demo" ] || [ "$mode" = "demo-title" ]; then
   npm run build
 else
@@ -21,5 +27,5 @@ if [ "$mode" = "demo" ]; then
 elif [ "$mode" = "demo-title" ]; then
   node --experimental-strip-types scripts/record-demo.mts --title
 else
-  node --experimental-strip-types scripts/test-obsidian-docker.mts
+  node --experimental-strip-types scripts/test-obsidian-docker.mts "$@"
 fi

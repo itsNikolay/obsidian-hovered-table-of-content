@@ -10,6 +10,7 @@ export default defineConfig(
 		'scripts',
 		'docker',
 		'esbuild.config.mjs',
+		'eslint.ui.config.mjs',
 		'version-bump.mjs',
 		'versions.json',
 		'vitest.config.ts',
@@ -39,8 +40,8 @@ export default defineConfig(
 		rules: { 'obsidianmd/prefer-create-el': 'off' },
 	},
 	{
-		// The release scan test runs in Node, not in Obsidian.
-		files: ['tests/unit/virustotal.test.ts'],
+		// Tooling and release scan tests run in Node, not in Obsidian.
+		files: ['tests/unit/virustotal.test.ts', 'tests/unit/tooling.test.ts'],
 		languageOptions: { globals: { ...globals.node } },
 		rules: { 'obsidianmd/no-nodejs-modules': 'off' },
 	},

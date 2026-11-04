@@ -2,6 +2,7 @@
 // With `--title`, records the focused linked-note table-of-contents title preview instead (docker:demo:title).
 // Uses a synthetic, disposable vault; never touches the host Obsidian or a personal vault.
 import { chromium, type Browser, type Locator, type Page } from 'playwright';
+import { isFullyInViewport } from './ui-visibility.mts';
 import type { ChildProcess } from 'node:child_process';
 import { mkdir, writeFile, copyFile } from 'node:fs/promises';
 import { spawn, spawnSync } from 'node:child_process';
@@ -278,22 +279,7 @@ try {
 		const scrollAfter = await previewScroller.evaluate((el) => el.scrollTop);
 		assert.ok(scrollAfter > scrollBefore, `the preview scrolls with the wheel, got ${scrollBefore} -> ${scrollAfter}`);
 		// The native preview renders lazily, so scroll with the wheel and wait until the end of the note is on screen.
-		const endVisible = async () => {
-			const marker = preview.getByText(endMarker, { exact: true });
-			if (!(await marker.isVisible())) return false;
-			const markerBox = await marker.boundingBox();
-			if (!markerBox) return false;
-			const viewport = await previewScroller.evaluate((el) => {
-				const rect = el.getBoundingClientRect();
-				return {
-					left: rect.left + el.clientLeft, top: rect.top + el.clientTop,
-					width: el.clientWidth, height: el.clientHeight,
-				};
-			});
-			return markerBox.x >= viewport.left && markerBox.y >= viewport.top
-				&& markerBox.x + markerBox.width <= viewport.left + viewport.width
-				&& markerBox.y + markerBox.height <= viewport.top + viewport.height;
-		};
+		const endVisible = () => isFullyInViewport(preview.getByText(endMarker, { exact: true }), previewScroller);
 		for (let attempt = 0; attempt < 60 && !(await endVisible()); attempt++) {
 			const { top, clientHeight, scrollHeight } = await previewScroller.evaluate((el) => ({
 				top: el.scrollTop, clientHeight: el.clientHeight, scrollHeight: el.scrollHeight,

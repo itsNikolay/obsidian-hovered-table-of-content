@@ -10,7 +10,7 @@
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
 		"typecheck": "tsc --noEmit",
 		"test": "vitest run",
-		"lint": "eslint . --max-warnings 0",
+		"lint": "eslint . --max-warnings 0 && npm run lint:ui",
 		"check": "npm run lint && npm run typecheck && npm test && npm run build",
 		"docker:test": "node scripts/run-docker.mjs unit",
 		"docker:check": "node scripts/run-docker.mjs check",
@@ -18,7 +18,10 @@
 		"docker:demo": "node scripts/run-docker.mjs demo",
 		"docker:demo:title": "node scripts/run-docker.mjs demo-title",
 		"scan:virustotal": "node --experimental-strip-types scripts/scan-virustotal.mts",
-		"version": "node version-bump.mjs && git add manifest.json versions.json"
+		"version": "node version-bump.mjs && git add manifest.json versions.json",
+		"lint:ui": "eslint --config eslint.ui.config.mjs scripts/test-obsidian-docker.mts scripts/record-demo.mts --max-warnings 0",
+		"agent:preflight": "node scripts/dsh-run.mjs --preflight",
+		"agent:dsh": "node scripts/dsh-run.mjs"
 	},
 	"keywords": [
 		"obsidian",

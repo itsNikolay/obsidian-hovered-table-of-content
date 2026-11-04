@@ -14,7 +14,7 @@ if (process.env.HTOC_DOCKER !== '1') throw new Error('Run this through npm run d
 
 const args = process.argv.slice(2);
 const scenario = args.length === 0 ? 'full' : args.length === 2 && args[0] === '--scenario' ? args[1] : undefined;
-if (scenario !== 'full' && scenario !== 'title-preview' && scenario !== 'preview-height') throw new Error('Unknown E2E scenario. Use full, title-preview or preview-height.');
+if (scenario !== 'full' && scenario !== 'title-preview' && scenario !== 'preview-whitespace' && scenario !== 'preview-styles') throw new Error('Unknown E2E scenario. Use full, title-preview, preview-whitespace or preview-styles.');
 
 const PLUGIN_ID = 'hovered-table-of-content';
 const vault = '/tmp/htoc-vault', profile = join(homedir(), '.config', 'obsidian'), out = '/artifacts';
@@ -182,8 +182,45 @@ async function runChecks() {
 	await page.waitForFunction(() => (globalThis as any).app.metadataCache.getCache('Main.md')?.headings?.length === 6, null, { timeout: 15000 });
 	await setMode('preview');
 
-	if (scenario === 'full' || scenario === 'preview-height') {
-		step('nested text previews keep the same height across section and title hovers');
+	if (scenario === 'full' || scenario === 'preview-styles') {
+		step('nested section previews retain the document reading styles');
+		// Reading-context selectors model theme heading dividers and note typography.
+		const themeStyle = await page.addStyleTag({ content: `
+			.markdown-reading-view h2 { border-bottom: 1px solid rgb(120, 130, 140); padding-bottom: 0.4em; }
+			.markdown-preview-view p { font-family: monospace; line-height: 1.75; }
+		` });
+		const documentStyles = await page.locator('.workspace-leaf.mod-active .markdown-reading-view').evaluate((el) => {
+			const heading = getComputedStyle(el.querySelector('h2')!);
+			const text = getComputedStyle(el.querySelector('p')!);
+			return { border: heading.borderBottom, padding: heading.paddingBottom,
+				font: text.fontFamily, lineHeight: text.lineHeight };
+		});
+		await page.locator('.workspace-leaf.mod-active .htoc-button').hover();
+		await page.locator('.htoc-toc').first().locator('.htoc-toc-item', { hasText: 'Setup' }).hover();
+		const section = page.locator('.htoc-preview').first();
+		await section.waitFor();
+		await section.locator('.htoc-link-toc').first().hover();
+		await page.locator('.htoc-toc').nth(1).locator('.htoc-toc-item', { hasText: 'Other part' }).hover();
+		const nested = page.locator('.htoc-preview').nth(1);
+		await nested.getByText('Other details live here.', { exact: false }).waitFor();
+		for (const preview of [section, nested]) {
+			const styles = await preview.evaluate((el) => {
+				const heading = getComputedStyle(el.querySelector('h2')!);
+				const text = getComputedStyle(el.querySelector('p')!);
+				return { border: heading.borderBottom, padding: heading.paddingBottom,
+					font: text.fontFamily, lineHeight: text.lineHeight };
+			});
+			console.log('  document styles', documentStyles, 'preview styles', styles);
+			assert.deepEqual(styles, documentStyles, 'section previews use the same reading styles as the document');
+		}
+		await page.screenshot({ path: `${out}/preview-styles.png` });
+		await moveAway();
+		await themeStyle.evaluate((el) => el.remove());
+		if (scenario === 'preview-styles') return;
+	}
+
+	if (scenario === 'full' || scenario === 'preview-whitespace') {
+		step('short section previews fit their content without white space');
 		await page.locator('.workspace-leaf.mod-active .htoc-button').hover();
 		const outerToc = page.locator('.htoc-toc').first();
 		await outerToc.waitFor();
@@ -198,34 +235,25 @@ async function runChecks() {
 		const innerSection = page.locator('.htoc-preview').nth(1);
 		await innerSection.getByText('Other details live here.', { exact: false }).waitFor();
 		await page.waitForTimeout(300);
-		const sectionHeight = (await innerSection.boundingBox())!.height;
-		const nestedTocBox = (await innerToc.boundingBox())!;
-		const nestedTextBox = (await innerSection.boundingBox())!;
-		assert.ok(Math.min(Math.abs(nestedTextBox.x - nestedTocBox.x - nestedTocBox.width),
-			Math.abs(nestedTextBox.x + nestedTextBox.width - nestedTocBox.x)) <= 1,
-			'the nested section preview touches the outside edge of its TOC');
-		await page.screenshot({ path: `${out}/preview-height-section.png` });
-		await innerToc.locator('.htoc-toc-title').hover();
-		const wholeNote = nativePreview('Other intro');
-		await wholeNote.waitFor();
-		await page.waitForTimeout(800);
-		const wholeHeight = (await wholeNote.boundingBox())!.height;
-		assert.ok(Math.abs(wholeHeight - sectionHeight) <= 1,
-			`the nested text window keeps its height on title hover: ${sectionHeight} -> ${wholeHeight}`);
-		await page.screenshot({ path: `${out}/preview-height-title.png` });
-		await part.hover();
-		await innerSection.waitFor();
-		await page.waitForTimeout(500);
-		assert.ok(Math.abs((await innerSection.boundingBox())!.height - wholeHeight) <= 1,
-			'the text window keeps its height when returning to a section');
-		await innerToc.locator('.htoc-toc-item', { hasText: 'Other note' }).hover();
-		await innerSection.getByText('Other intro.', { exact: true }).waitFor();
-		assert.ok(Math.abs((await innerSection.boundingBox())!.height - sectionHeight) <= 1,
-			'sections with different content lengths use the same window height');
+		const whitespace = await innerSection.evaluate((el) => {
+			const content = el.querySelector<HTMLElement>('.htoc-preview-content');
+			const wrapper = el.querySelector<HTMLElement>('.htoc-popup-content');
+			const last = content?.lastElementChild;
+			if (!content || !last || !wrapper) return Infinity;
+			const elRect = el.getBoundingClientRect();
+			const lastRect = last.getBoundingClientRect();
+			const padBottom = parseFloat(getComputedStyle(wrapper).paddingBottom) || 0;
+			return elRect.bottom - lastRect.bottom - padBottom;
+		});
+		console.log('  white space below short preview content:', whitespace);
+		assert.ok(Math.abs(whitespace) <= 1, `a short section preview has ${whitespace}px of white space or clipped content`);
+		assert.ok(await innerSection.evaluate((el) => el.scrollHeight <= el.clientHeight + 1),
+			'a short section fits inside its preview without scrolling');
+		await page.screenshot({ path: `${out}/preview-whitespace.png` });
 		await moveAway();
 		await page.waitForTimeout(800);
-		assert.equal(await page.locator('.htoc-popup, .hover-popover').count(), 0, 'the height check releases its popup chain');
-		if (scenario === 'preview-height') return;
+		assert.equal(await page.locator('.htoc-popup, .hover-popover').count(), 0, 'the whitespace check releases its popup chain');
+		if (scenario === 'preview-whitespace') return;
 	}
 
 	step('T button is shown at the default position (top right)');

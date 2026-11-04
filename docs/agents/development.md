@@ -20,7 +20,8 @@ The coordinator executes Docker validation. DSH workers write tests and code, re
 ```sh
 npm run docker:test -- tests/unit/toc.test.ts -t 'clicking the title'
 npm run docker:e2e -- --scenario title-preview
-npm run docker:e2e -- --scenario preview-height
+npm run docker:e2e -- --scenario preview-whitespace
+npm run docker:e2e -- --scenario preview-styles
 npm run docker:check
 ```
 
@@ -36,4 +37,6 @@ Use focused checks while iterating and `docker:check` before completion. After a
 
 For evidence that text is on screen inside a scrollable preview, use `isFullyInViewport` from `scripts/ui-visibility.mts`. `isVisible()` alone also accepts rendered content outside the viewport. Both the focused E2E scenario and the video recorder use the shared helper.
 
-`preview-height` checks the nested text window across short section, whole-note title and section hovers. It runs after shared app setup and is also included in the full suite.
+`preview-whitespace` checks that a short nested section preview fits its content without unused space below it. It runs after shared app setup and is also included in the full suite.
+
+`preview-styles` compares heading dividers, typography and spacing between the document and two levels of section previews using representative reading-context theme selectors. It is also included in the full suite.

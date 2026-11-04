@@ -135,7 +135,8 @@ export class TocController {
 		const markdown = extractSection(content, headings, Math.max(found, 0));
 
 		const container = (popup.contentEl.ownerDocument.win as typeof window).createDiv();
-		container.className = 'htoc-preview-content markdown-rendered';
+		popup.contentEl.classList.add('markdown-reading-view');
+		container.className = 'htoc-preview-content markdown-preview-view markdown-rendered';
 		popup.contentEl.append(container);
 		const release = await this.host.renderMarkdown(markdown, container, path);
 		popup.onClose(release);

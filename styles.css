@@ -176,19 +176,26 @@
 	font-variant-numeric: tabular-nums;
 }
 
-/* Section previews look like Obsidian's own page previews: same size, margins and font size. */
+/* Section previews look like Obsidian's own page previews: same size, margins and font size.
+   Height follows the content, capped at the theme's popover height, so short sections have no white space. */
 .htoc-preview,
 .popover.hover-popover.htoc-title-preview {
 	box-sizing: border-box;
-	height: var(--popover-height);
 	width: calc(var(--popover-width) + 2 * var(--border-width));
 	max-width: 80vw;
-	max-height: calc(100vh - 8px);
+	max-height: min(var(--popover-height), calc(100vh - 8px));
 	font-size: var(--popover-font-size);
 }
 
 .htoc-preview > .htoc-popup-content {
 	padding: var(--file-margins);
+}
+
+/* Keep the popup as the scroll container while applying the note's reading styles. */
+.htoc-preview-content.markdown-preview-view {
+	padding: 0;
+	min-height: 0;
+	overflow: visible;
 }
 
 .htoc-preview-content > :first-child {

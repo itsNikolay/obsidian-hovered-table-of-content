@@ -5,6 +5,13 @@ export interface ApiResponse { data?: { id?: string; attributes?: AnalysisAttrib
 export interface ClientOptions { apiKey?: string; fetchImpl?: typeof fetch; sleep?: (ms: number) => Promise<unknown>; now?: () => number; intervalMs?: number; maxAttempts?: number }
 export type Verdict = { status: 'pending' } | { status: 'flagged' | 'no-detections'; detected: number; analyzed: number };
 
+export class VirusTotalApiError extends Error {
+	readonly status: number;
+	constructor(status: number) {
+		super(`VirusTotal API failed (HTTP ${status}); scan not verified`);
+		this.status = status;
+	}
+}
 
 export function verdict(attributes?: AnalysisAttributes): Verdict {
 	if (!attributes || !['queued', 'in-progress', 'completed'].includes(attributes.status))
@@ -27,7 +34,7 @@ export function createClient({ apiKey, fetchImpl = fetch,
 	if (!apiKey?.trim()) throw new Error('VIRUSTOTAL_API_KEY is required; configure a GitHub Actions secret');
 	let lastRequest = -Infinity;
 	return {
-		async request(path: string, { method = 'GET', body }: { method?: string; body?: BodyInit } = {}): Promise<ApiResponse> {
+		async request(path: string, { method = 'GET', body, allowMissingAnalysis = false }: { method?: string; body?: BodyInit; allowMissingAnalysis?: boolean } = {}): Promise<ApiResponse> {
 			if (!/^\/(files|analyses)(\/[^?#]+)?$/.test(path)) throw new Error('Invalid VirusTotal API path');
 			for (let attempt = 0; attempt < maxAttempts; attempt++) {
 				await sleep(Math.max(0, intervalMs - (now() - lastRequest)));
@@ -41,14 +48,15 @@ export function createClient({ apiKey, fetchImpl = fetch,
 					try { return await response.json() as ApiResponse; }
 					catch { throw new Error('VirusTotal returned invalid JSON'); }
 				}
-				if ((response.status === 429 || response.status >= 500) && attempt + 1 < maxAttempts) {
+				const missingAnalysis = allowMissingAnalysis && method === 'GET' && path.startsWith('/analyses/') && response.status === 404;
+				if ((missingAnalysis || response.status === 429 || response.status >= 500) && attempt + 1 < maxAttempts) {
 					// Respect the public API quota; do not print server responses or the API key.
 					const retryAfter = Number(response.headers?.get('retry-after'));
-					const backoff = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 60000 * (attempt + 1);
+					const backoff = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : (missingAnalysis ? 16000 : 60000) * (attempt + 1);
 					await sleep(Math.min(180000, Math.max(16000, backoff)));
 					continue;
 				}
-				throw new Error(`VirusTotal API failed (HTTP ${response.status}); scan not verified`);
+				throw new VirusTotalApiError(response.status);
 			}
 			throw new Error('VirusTotal API retry limit exceeded');
 		}

@@ -2,7 +2,7 @@ import { readFile, writeFile, mkdir, lstat } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { createClient, verdict, type Verdict } from './virustotal-client.mts';
+import { createClient, verdict, VirusTotalApiError, type ApiResponse, type Verdict } from './virustotal-client.mts';
 
 const files = ['main.js', 'manifest.json', 'styles.css'];
 interface ScanItem { name: string; sha256: string; status: Verdict['status']; url: string; analysisId?: string; detected?: number; analyzed?: number; stats?: Record<string, number>; analysisDate?: number; completedAt?: string }
@@ -36,12 +36,19 @@ export async function scanRelease({ directory = '.', output = 'artifacts/virusto
 			report.files.push(item);
 			const form = new FormData();
 			form.append('file', new Blob([new Uint8Array(file.bytes)]), file.name);
-			const uploaded = await client.request('/files', { method: 'POST', body: form });
+			let uploaded: ApiResponse;
+			try {
+				uploaded = await client.request('/files', { method: 'POST', body: form });
+			} catch (error) {
+				if (!(error instanceof VirusTotalApiError) || error.status !== 409) throw error;
+				// An existing file still needs a fresh analysis, not a cached file report.
+				uploaded = await client.request(`/files/${file.sha256}/analyse`, { method: 'POST' });
+			}
 			const id = uploaded.data?.id;
 			if (typeof id !== 'string' || !id.length) throw new Error('VirusTotal returned no analysis ID');
 			item.analysisId = id;
 			while (now() < deadline) {
-				const analysis = await client.request(`/analyses/${encodeURIComponent(id)}`);
+				const analysis = await client.request(`/analyses/${encodeURIComponent(id)}`, { allowMissingAnalysis: true });
 				const result = verdict(analysis.data?.attributes);
 				const remoteHash = analysis.meta?.file_info?.sha256;
 				if (remoteHash && remoteHash !== file.sha256) throw new Error('VirusTotal analysis hash mismatch');

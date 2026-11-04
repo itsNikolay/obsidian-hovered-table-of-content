@@ -135,6 +135,26 @@ describe('VirusTotal client', () => {
 		expect(calls).toBe(4);
 	});
 
+	test('only fresh analysis lookups retry missing resources, with bounded attempts', async () => {
+		let calls = 0;
+		const client = createClient({ apiKey: secret, ...clock(), maxAttempts: 3,
+			fetchImpl: (async () => response(++calls === 1 ? 404 : 200, { data: { id: 'fresh' } })) });
+		expect(await client.request('/analyses/fresh', { allowMissingAnalysis: true })).toEqual({ data: { id: 'fresh' } });
+		expect(calls).toBe(2);
+		for (const [path, options, expected] of [
+			['/analyses/missing', { allowMissingAnalysis: true }, 3],
+			['/analyses/missing', {}, 1],
+			['/files/missing', { allowMissingAnalysis: true }, 1],
+			['/analyses/missing', { method: 'POST', allowMissingAnalysis: true }, 1],
+		] as const) {
+			let attempts = 0;
+			const missing = createClient({ apiKey: secret, ...clock(), maxAttempts: 3,
+				fetchImpl: (async () => { attempts++; return response(404, {}); }) });
+			await expect(missing.request(path, options)).rejects.toThrow(/HTTP 404/);
+			expect(attempts).toBe(expected);
+		}
+	});
+
 	test('authentication failures are not retried or exposed with secret data', async () => {
 		let calls = 0;
 		const client = createClient({ apiKey: secret, ...clock(),
@@ -172,6 +192,33 @@ describe('release scan', () => {
 		expect(markdown).toContain('Hovered Table of Content 1.0.0');
 		expect(markdown).toContain(result.files[0]!.sha256);
 		expect(JSON.stringify(saved)).not.toContain('PRIVATE MUST NEVER UPLOAD');
+	});
+
+	test('conflicting uploads request fresh hash-specific analyses instead of accepting cached reports', async () => {
+		const locations = await fixture();
+		const hashes = await Promise.all(['main.js', 'manifest.json', 'styles.css'].map(async name => sha256(await readFile(join(locations.directory, name)))));
+		const rescans: string[] = [];
+		const client = createClient({ apiKey: secret, ...clock(), fetchImpl: (async (url: string, options: RequestInit) => {
+			if (url.endsWith('/files') && options.method === 'POST') return response(409, {});
+			if (url.endsWith('/analyse') && options.method === 'POST') {
+				rescans.push(url.split('/').at(-2)!);
+				return response(200, { data: { id: `fresh-${rescans.length}` } });
+			}
+			expect(url).toContain(`/analyses/fresh-${rescans.length}`);
+			return response(200, { data: { attributes: { status: 'completed', stats: cleanStats } }, meta: { file_info: { sha256: rescans.at(-1) } } });
+		}) as typeof fetch });
+		const report = await scanRelease({ ...locations, client });
+		expect(rescans).toEqual(hashes);
+		expect(report.status).toBe('no-detections');
+		expect(report.files.map(item => item.analysisId)).toEqual(['fresh-1', 'fresh-2', 'fresh-3']);
+	});
+
+	test('failed fresh rescans keep the release blocked', async () => {
+		const locations = await fixture();
+		const client = createClient({ apiKey: secret, ...clock(), fetchImpl: (async (url: string) =>
+			response(url.endsWith('/files') ? 409 : 403, {})) as typeof fetch });
+		await expect(scanRelease({ ...locations, client })).rejects.toThrow(/HTTP 403/);
+		expect((await readReport(locations.output)).status).toBe('incomplete');
 	});
 
 	test('rejects a manifest from another plugin', async () => {

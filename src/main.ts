@@ -244,6 +244,13 @@ export default class HoveredTocPlugin extends Plugin {
 					: showing.find((l) => l === active) ?? showing[0] ?? app.workspace.getLeaf(false);
 				void leaf.openFile(file, { active: true, eState: { line: heading.line } });
 			},
+			openNote: (path, newTab) => {
+				const file = fileOf(path);
+				if (!file) return;
+				// An ordinary click uses the current tab, even when another tab already shows the note.
+				const leaf = newTab ? app.workspace.getLeaf('tab') : app.workspace.getLeaf(false);
+				void leaf.openFile(file, { active: true, eState: { line: 0 } });
+			},
 			openLink: (linktext, sourcePath, newTab) => {
 				void app.workspace.openLinkText(linktext, sourcePath, newTab);
 			},

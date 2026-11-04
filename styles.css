@@ -131,6 +131,7 @@
 }
 
 .htoc-toc-title {
+	cursor: pointer;
 	padding: 2px 8px 6px;
 	border-bottom: 1px solid var(--background-modifier-border);
 	margin-bottom: 4px;

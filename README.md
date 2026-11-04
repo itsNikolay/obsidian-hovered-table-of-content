@@ -21,6 +21,7 @@ Obsidian's core Outline view lives in a sidebar and only shows the active note. 
 ## Features
 
 - **T icon.** Every note gets a small square **T** button right after its title. Hover over it to see the note's table of contents in a popup. When a table of contents or a preview is too long to fit, its bottom fades out until you scroll to the end.
+- **Note preview from the popup title.** Hover the title of any table of contents to preview the whole note using Obsidian's Page Preview settings. Move into the preview to read, scroll or follow links. Click the title to open the note from the beginning in the current tab; Ctrl/Cmd-click opens it in a new tab. This also works for sticky-heading tables of contents, whose title still shows the section name.
 - **Section previews.** Hover over a heading in the table of contents to preview that section: the heading, its text and its subsections. The heading stays highlighted while its preview is open, so you can see which section you are reading. Click the heading to jump to it (Ctrl/Cmd-click opens it in a new tab).
 - **Previews of linked notes.** Hover over a link inside a preview to see the linked note in Obsidian's page preview. Every link to another note also gets its own **T** icon. Hover over it to see the linked note's table of contents, which previews its sections in turn.
 - **T on links in notes.** Every link to another note in the note itself gets a **T** right after it, in Reading view and Live Preview. Hover over it to see the linked note's table of contents.
@@ -81,6 +82,7 @@ npm run docker:test    # lint, typecheck, unit tests (vitest + jsdom), build
 npm run docker:check   # all of the above + end-to-end tests in real Obsidian
 npm run docker:e2e     # only the end-to-end tests in real Obsidian
 npm run docker:demo    # re-record docs/demo.gif in real Obsidian
+npm run docker:demo:title # record artifacts/docker/toc-title-preview.mp4
 ```
 
 The end-to-end run uses a synthetic vault created inside the container (`--network=none`). Screenshots and `report.json` are written to `artifacts/docker/`.

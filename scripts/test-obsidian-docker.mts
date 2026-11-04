@@ -96,6 +96,48 @@ async function moveAway() {
 	assert.equal(await page!.locator('.htoc-popup').count(), 0, 'popups close when the pointer leaves');
 }
 
+const nativePreview = (text: string) => page!.locator('.hover-popover', { hasText: text }).last();
+const activeNoteFile = () => page!.evaluate(() => {
+	const g = globalThis as any;
+	return g.app.workspace.getMostRecentLeaf()?.view?.file?.path ?? null;
+});
+const activeNoteScroll = () => page!.evaluate(() => {
+	const g = globalThis as any;
+	return g.app.workspace.getMostRecentLeaf()?.view?.currentMode?.getScroll?.() ?? null;
+});
+const waitForActiveNoteAtBeginning = (path: string) => page!.waitForFunction((path) => {
+	const g = globalThis as any;
+	const view = g.app.workspace.getMostRecentLeaf()?.view;
+	return view?.file?.path === path && (view.currentMode?.getScroll?.() ?? Infinity) < 3;
+}, path, { timeout: 5000 });
+
+/** Page Preview's core plugin settings: enabled, and per hover source whether Mod is required. */
+const pagePreviewPlugin = () => page!.evaluate(() => {
+	const g = globalThis as any;
+	const plugin = g.app.internalPlugins.plugins['page-preview'];
+	return { enabled: plugin.enabled, options: { ...plugin.instance.options } };
+});
+
+async function setPagePreviewRequireModifier(required: boolean) {
+	await page!.evaluate(async ({ id, required }) => {
+		const g = globalThis as any;
+		const plugin = g.app.internalPlugins.plugins['page-preview'];
+		if (required) plugin.instance.options[id] = true;
+		else delete plugin.instance.options[id];
+		await plugin.saveData(plugin.instance.options);
+	}, { id: PLUGIN_ID, required });
+}
+
+async function setPagePreviewEnabled(enabled: boolean) {
+	await page!.evaluate(async (enabled) => {
+		const g = globalThis as any;
+		const plugin = g.app.internalPlugins.plugins['page-preview'];
+		if (enabled) await plugin.enable(true);
+		else plugin.disable(true);
+	}, enabled);
+	await page!.waitForTimeout(300);
+}
+
 try {
 	app = spawn(process.env.OBSIDIAN_EXECUTABLE || '/opt/squashfs-root/obsidian', ['--no-sandbox', '--disable-gpu',
 		'--remote-debugging-port=9222', `--user-data-dir=${profile}`], { stdio: ['ignore', 'ignore', 'pipe'] });
@@ -156,6 +198,94 @@ try {
 	assert.equal(await toc.locator('.htoc-toc-item').nth(3).evaluate((el) => getComputedStyle(el, '::before').content), '"2."', 'the number is shown before the heading');
 	await page.screenshot({ path: `${out}/toc-popover.png` });
 
+	step('hovering the table of contents title previews the whole note');
+	const pagePreviewDefaults = await pagePreviewPlugin();
+	assert.equal(pagePreviewDefaults.enabled, true, 'Page Preview is on by default');
+	assert.notEqual(pagePreviewDefaults.options[PLUGIN_ID], true, 'the title preview does not require a modifier by default');
+	const title = toc.locator('.htoc-toc-title');
+	await title.hover();
+	const notePagePreview = page.locator('.hover-popover').first();
+	await notePagePreview.waitFor({ timeout: 5000 });
+	await notePagePreview.getByText('Guide paragraph 1. Synthetic text for scrolling.', { exact: true }).waitFor({ timeout: 5000 });
+	assert.equal(await toc.isVisible(), true, 'the table of contents stays open when its title preview opens');
+	await page.screenshot({ path: `${out}/title-preview.png` });
+
+	step('moving into the title page preview keeps the table of contents open and the preview scrolls');
+	const notePreviewBox = (await notePagePreview.boundingBox())!;
+	await page.mouse.move(notePreviewBox.x + notePreviewBox.width / 2, notePreviewBox.y + notePreviewBox.height / 2, { steps: 5 });
+	await page.waitForTimeout(1000);
+	assert.equal(await toc.isVisible(), true, 'the table of contents stays open while the page preview is hovered');
+	const previewScroller = notePagePreview.locator('.markdown-preview-view');
+	const beforeScroll = await previewScroller.evaluate((el) => el.scrollTop);
+	await page.mouse.wheel(0, 700);
+	await page.waitForTimeout(500);
+	const afterScroll = await previewScroller.evaluate((el) => el.scrollTop);
+	assert.ok(afterScroll > beforeScroll, `the page preview scrolls, got ${beforeScroll} -> ${afterScroll}`);
+	await previewScroller.evaluate((el) => el.scrollTo(0, el.scrollHeight));
+	await notePagePreview.getByText('FAQ paragraph 14. Synthetic text for scrolling.', { exact: true }).waitFor({ timeout: 5000 });
+	assert.equal(await toc.isVisible(), true, 'the entire note remains accessible beyond its initial rendered section');
+	await previewScroller.evaluate((el) => el.scrollTo(0, 500));
+	await page.waitForTimeout(300);
+
+	step('links inside the title page preview open nested previews without closing the table of contents');
+	const previewLink = notePagePreview.locator('a.internal-link', { hasText: 'Other' }).first();
+	await previewLink.scrollIntoViewIfNeeded();
+	await previewLink.hover();
+	const nestedPagePreview = nativePreview('Other intro');
+	await nestedPagePreview.waitFor({ timeout: 5000 });
+	await page.waitForTimeout(1000);
+	assert.equal(await toc.isVisible(), true, 'the table of contents stays open through nested page previews');
+	assert.equal(await notePagePreview.isVisible(), true, 'the title page preview stays open while its link is previewed');
+	await page.screenshot({ path: `${out}/title-preview-nested.png` });
+
+	step('closing the title table of contents releases its page preview');
+	await page.keyboard.press('Escape');
+	await page.waitForTimeout(200);
+	await page.keyboard.press('Escape');
+	await page.waitForTimeout(500);
+	assert.equal(await page.locator('.htoc-popup').count(), 0, 'the table of contents closes');
+	assert.equal(await page.locator('.hover-popover').count(), 0, 'no title page preview is left orphaned');
+
+	step('the title preview honors the Page Preview modifier requirement');
+	await setPagePreviewRequireModifier(true);
+	await button.hover();
+	await toc.waitFor({ timeout: 3000 });
+	await title.hover();
+	await page.waitForTimeout(1000);
+	assert.equal(await page.locator('.hover-popover').count(), 0, 'no title preview without the required Mod');
+	const titleBox = (await title.boundingBox())!;
+	await page.keyboard.down('Control');
+	await page.mouse.move(titleBox.x + 5, titleBox.y + titleBox.height / 2, { steps: 2 });
+	const modifiedPreview = nativePreview('Guide paragraph 1');
+	await modifiedPreview.waitFor({ timeout: 5000 });
+	await page.keyboard.up('Control');
+	assert.equal(await toc.isVisible(), true, 'the table of contents stays open with the required Mod');
+	await page.keyboard.press('Escape');
+	await page.waitForTimeout(500);
+	await setPagePreviewRequireModifier(false);
+	await moveAway();
+	await page.waitForTimeout(800);
+	assert.equal(await page.locator('.hover-popover').count(), 0, 'the modifier preview closed before the disabled check');
+
+	step('disabling Page Preview prevents the title preview but not title navigation');
+	await setPagePreviewEnabled(false);
+	await button.hover();
+	await toc.waitFor({ timeout: 3000 });
+	await title.hover();
+	await page.waitForTimeout(1000);
+	assert.equal(await page.locator('.hover-popover').count(), 0, 'no title preview while Page Preview is disabled');
+	await title.click();
+	await page.waitForTimeout(700);
+	assert.equal(await page.locator('.htoc-popup').count(), 0, 'title navigation closes the table of contents');
+	assert.equal(await activeNoteFile(), 'Main.md', 'title navigation still opens the note');
+	const disabledScroll = await activeNoteScroll();
+	assert.ok(disabledScroll < 3, `the note opens at its beginning with Page Preview disabled, got scroll ${disabledScroll}`);
+	await page.screenshot({ path: `${out}/title-click-page-preview-disabled.png` });
+	await moveAway();
+	await setPagePreviewEnabled(true);
+	await button.hover();
+	await toc.waitFor({ timeout: 3000 });
+
 	step('hovering an item previews its section, links inside get their own T icon');
 	await toc.locator('.htoc-toc-item', { hasText: 'Setup' }).hover();
 	const preview = page.locator('.htoc-preview').first();
@@ -184,7 +314,18 @@ try {
 	await page.waitForTimeout(300);
 	assert.match((await nestedPreview.textContent()) ?? '', /Other details live here/);
 	await page.screenshot({ path: `${out}/nested-preview.png` });
+
+	step('the title of a table of contents opened inside a section preview previews its whole note');
+	await nestedToc.locator('.htoc-toc-title').hover();
+	const nestedTitlePreview = nativePreview('Other intro');
+	await nestedTitlePreview.waitFor({ timeout: 5000 });
+	assert.match((await nestedTitlePreview.textContent()) ?? '', /Other details live here/);
+	assert.equal(await nestedToc.isVisible(), true, 'the nested table of contents stays open while its title is previewed');
+	assert.equal(await preview.isVisible(), true, 'the parent section preview stays in the chain');
+	await page.screenshot({ path: `${out}/nested-title-preview.png` });
 	await moveAway();
+	await page.waitForTimeout(800);
+	assert.equal(await page.locator('.hover-popover').count(), 0, 'the title page preview closes with the chain');
 
 	step('moving to another heading highlights only that heading, also before its preview opens');
 	await button.hover();
@@ -356,7 +497,7 @@ try {
 	await embeddedBaseLink.waitFor({ timeout: 5000 });
 	await page.keyboard.down('Control');
 	await embeddedBaseLink.hover();
-	const folderPreview = pagePreviewOf('Folder intro');
+	const folderPreview = pagePreviewOf('Folder intro').first();
 	await folderPreview.waitFor({ timeout: 5000 });
 	await page.keyboard.up('Control');
 	await folderPreview.locator('.htoc-preview-button').hover({ timeout: 3000 });
@@ -364,9 +505,36 @@ try {
 	await folderPreviewToc.waitFor({ timeout: 3000 });
 	assert.deepEqual(await folderPreviewToc.locator('.htoc-toc-item').allTextContents(), ['Folder map', 'Folder part']);
 	await page.screenshot({ path: `${out}/embedded-base-page-preview.png` });
+
+	step('the title of a table of contents inside a page preview previews the note in its folder');
+	const previewsBeforeTitle = await page.locator('.hover-popover').count();
+	await folderPreviewToc.locator('.htoc-toc-title').hover();
+	await page.waitForFunction((count) => document.querySelectorAll('.hover-popover').length > count, previewsBeforeTitle, { timeout: 5000 });
+	const folderTitlePreview = page.locator('.hover-popover').last();
+	assert.match((await folderTitlePreview.textContent()) ?? '', /Folder details/);
+	assert.equal(await folderPreviewToc.isVisible(), true, 'the table of contents inside the page preview stays open');
+	assert.equal(await folderPreview.isVisible(), true, 'the page preview holding the table of contents stays open');
+	await page.screenshot({ path: `${out}/folder-title-preview.png` });
 	await moveAway();
 	await page.waitForTimeout(1000);
-	assert.equal(await page.locator('.hover-popover').count(), 0, 'the page preview closes with the popups');
+	assert.equal(await page.locator('.hover-popover').count(), 0, 'the page previews close with the popups');
+
+	step('clicking the title opens the folder note from its beginning in the current tab');
+	await page.keyboard.down('Control');
+	await embeddedBaseLink.hover();
+	await folderPreview.waitFor({ timeout: 5000 });
+	await page.keyboard.up('Control');
+	await folderPreview.locator('.htoc-preview-button').hover({ timeout: 3000 });
+	await folderPreviewToc.waitFor({ timeout: 3000 });
+	await folderPreviewToc.locator('.htoc-toc-title').click();
+	await page.waitForTimeout(700);
+	await waitForActiveNoteAtBeginning('Maps/Map in folder.md');
+	assert.equal(await activeNoteFile(), 'Maps/Map in folder.md', 'the title resolves the note in its folder');
+	assert.equal(await page.locator('.htoc-popup').count(), 0, 'title navigation closes the popup chain');
+	await page.screenshot({ path: `${out}/folder-title-click.png` });
+	await moveAway();
+	await page.waitForTimeout(1000);
+	assert.equal(await page.locator('.hover-popover').count(), 0, 'the page previews close with navigation');
 	await setMode('preview');
 
 	step('clicking an item scrolls to the heading');
@@ -376,6 +544,83 @@ try {
 	const scroll = await page.evaluate(() => (globalThis as any).app.workspace.getMostRecentLeaf().view.currentMode.getScroll());
 	assert.ok(Math.abs(scroll - lineOf('Usage')) < 3, `scrolled to Usage (line ${lineOf('Usage')}), got ${scroll}`);
 	await moveAway();
+
+	step('clicking the title opens the already-scrolled note from its beginning in the current tab');
+	assert.equal(await activeNoteFile(), 'Main.md');
+	await button.hover();
+	await toc.waitFor({ timeout: 3000 });
+	const previewsBeforeClick = await page.locator('.hover-popover').count();
+	assert.equal(previewsBeforeClick, 0, 'no page preview is open before the title is hovered');
+	await title.hover();
+	await page.waitForFunction((count) => document.querySelectorAll('.hover-popover').length > count, previewsBeforeClick, { timeout: 5000 });
+	await title.click();
+	await page.waitForTimeout(700);
+	await waitForActiveNoteAtBeginning('Main.md');
+	assert.equal(await page.locator('.htoc-popup').count(), 0, 'title navigation closes the table of contents');
+	assert.equal(await page.locator('.hover-popover').count(), 0, 'title navigation releases the open title preview');
+	await page.screenshot({ path: `${out}/title-click-current-tab.png` });
+
+	step('Ctrl-clicking the title opens the note from its beginning in a new tab');
+	await scrollToLine(lineOf('Usage'));
+	await page.evaluate(() => {
+		const g = globalThis as any;
+		g.__htocOriginalLeaf = g.app.workspace.getMostRecentLeaf();
+		g.__htocLeafCount = g.app.workspace.getLeavesOfType('markdown').length;
+	});
+	await button.hover();
+	await toc.waitFor({ timeout: 3000 });
+	await toc.locator('.htoc-toc-title').click({ modifiers: ['Control'] });
+	await page.waitForFunction(() => {
+		const g = globalThis as any;
+		const leaf = g.app.workspace.getMostRecentLeaf();
+		return g.app.workspace.getLeavesOfType('markdown').length === g.__htocLeafCount + 1
+			&& leaf !== g.__htocOriginalLeaf
+			&& leaf?.view?.file?.path === 'Main.md'
+			&& (leaf.view.currentMode?.getScroll?.() ?? Infinity) < 3;
+	}, null, { timeout: 5000 });
+	assert.equal(await page.locator('.htoc-popup').count(), 0, 'title navigation closes the table of contents');
+	assert.equal(await page.locator('.hover-popover').count(), 0, 'title navigation leaves no page preview');
+	await page.screenshot({ path: `${out}/title-click-new-tab.png` });
+
+	step('an ordinary title click keeps the current tab when another tab already shows the note');
+	await scrollToLine(lineOf('Usage'));
+	await page.evaluate(() => {
+		const g = globalThis as any;
+		g.__htocCurrentLeaf = g.app.workspace.getMostRecentLeaf();
+	});
+	await button.hover();
+	await toc.waitFor({ timeout: 3000 });
+	await toc.locator('.htoc-toc-title').click();
+	await page.waitForTimeout(700);
+	await waitForActiveNoteAtBeginning('Main.md');
+	const stayed = await page.evaluate(() => {
+		const g = globalThis as any;
+		const leaf = g.app.workspace.getMostRecentLeaf();
+		return {
+			same: leaf === g.__htocCurrentLeaf,
+			path: leaf?.view?.file?.path,
+			scroll: leaf?.view?.currentMode?.getScroll?.(),
+			count: g.app.workspace.getLeavesOfType('markdown').length,
+		};
+	});
+	assert.equal(stayed.same, true, 'the current tab is used even though another tab shows the same note');
+	assert.equal(stayed.path, 'Main.md');
+	assert.equal(stayed.count, 2, 'no third tab is opened');
+	assert.ok(stayed.scroll < 3, `the note is at its beginning, got scroll ${stayed.scroll}`);
+
+	await page.evaluate(async () => {
+		const g = globalThis as any;
+		const original = g.__htocOriginalLeaf;
+		const active = g.app.workspace.getMostRecentLeaf();
+		if (active !== original) active.detach();
+		g.app.workspace.setActiveLeaf(original, { focus: true });
+		await original.openFile(g.app.vault.getAbstractFileByPath('Main.md'));
+		delete g.__htocOriginalLeaf;
+		delete g.__htocLeafCount;
+		delete g.__htocCurrentLeaf;
+	});
+	await page.waitForTimeout(600);
+	assert.equal(await page.evaluate(() => (globalThis as any).app.workspace.getLeavesOfType('markdown').length), 1, 'the extra tab is closed');
 
 	step('a long table of contents fades out at the bottom until it is scrolled to the end');
 	await page.evaluate(async () => {
@@ -411,10 +656,21 @@ try {
 		assert.ok(iconBox.x >= linkBox.x + linkBox.width - 1 && iconBox.x - (linkBox.x + linkBox.width) < 12, 'the T sits right after the link');
 		assert.ok(Math.abs(iconBox.y + iconBox.height / 2 - (linkBox.y + linkBox.height / 2)) < 6, 'the T is on the line of the link');
 		await noteLinkIcons(mode).first().hover();
-		await page.locator('.htoc-toc').first().waitFor({ timeout: 3000 });
-		assert.deepEqual(await page.locator('.htoc-toc').first().locator('.htoc-toc-item').allTextContents(), ['Other note', 'Other part']);
+		const noteLinkToc = page.locator('.htoc-toc').first();
+		await noteLinkToc.waitFor({ timeout: 3000 });
+		assert.deepEqual(await noteLinkToc.locator('.htoc-toc-item').allTextContents(), ['Other note', 'Other part']);
 		await page.screenshot({ path: `${out}/note-link-${mode}.png` });
+
+		step(`the title of the table of contents from a note link previews its whole note in ${mode} mode`);
+		await noteLinkToc.locator('.htoc-toc-title').hover();
+		const noteLinkTitlePreview = nativePreview('Other intro');
+		await noteLinkTitlePreview.waitFor({ timeout: 5000 });
+		assert.match((await noteLinkTitlePreview.textContent()) ?? '', /Other details live here/);
+		assert.equal(await noteLinkToc.isVisible(), true, 'the table of contents from the note link stays open');
+		await page.screenshot({ path: `${out}/note-link-title-${mode}.png` });
 		await moveAway();
+		await page.waitForTimeout(800);
+		assert.equal(await page.locator('.hover-popover').count(), 0, 'the note link title preview closes with the chain');
 	}
 	step('links in source mode get no T');
 	await setMode('source');
@@ -441,11 +697,38 @@ try {
 	assert.deepEqual(await stickyTexts(), ['Guide', 'Setup']);
 	await page.locator('.workspace-leaf.mod-active .htoc-sticky-row').last().locator('.htoc-sticky-toc').hover();
 	await page.locator('.htoc-toc').first().waitFor({ timeout: 3000 });
-	assert.deepEqual(await page.locator('.htoc-toc').first().locator('.htoc-toc-item').allTextContents(), ['Install', 'Configure']);
+	const stickyToc = page.locator('.htoc-toc').first();
+	assert.deepEqual(await stickyToc.locator('.htoc-toc-item').allTextContents(), ['Install', 'Configure']);
 	await page.screenshot({ path: `${out}/sticky-toc.png` });
+
+	step("a sticky heading's table of contents title previews the whole note");
+	assert.equal(await stickyToc.locator('.htoc-toc-title').textContent(), 'Setup', 'the title still shows the sticky heading');
+	await stickyToc.locator('.htoc-toc-title').hover();
+	const stickyTitlePreview = nativePreview('Guide paragraph 1');
+	await stickyTitlePreview.waitFor({ timeout: 5000 });
+	const stickyPreviewText = (await stickyTitlePreview.textContent()) ?? '';
+	assert.match(stickyPreviewText, /Guide paragraph 1\./, 'the preview starts at the beginning of the note');
+	assert.equal(await stickyToc.isVisible(), true, 'the sticky heading table of contents stays open');
+	assert.deepEqual(await stickyToc.locator('.htoc-toc-item').allTextContents(), ['Install', 'Configure'], 'the subheadings are unchanged');
+	await page.screenshot({ path: `${out}/sticky-title-preview.png` });
 	await moveAway();
+	await page.waitForTimeout(800);
+	assert.equal(await page.locator('.hover-popover').count(), 0, 'the sticky title preview closes with the chain');
+
+	step("clicking a sticky heading's custom title opens the whole note from its beginning");
+	await page.locator('.workspace-leaf.mod-active .htoc-sticky-row').last().locator('.htoc-sticky-toc').hover();
+	await stickyToc.waitFor({ timeout: 3000 });
+	assert.equal(await stickyToc.locator('.htoc-toc-title').textContent(), 'Setup', 'the title still shows the sticky heading');
+	await stickyToc.locator('.htoc-toc-title').click();
+	await page.waitForTimeout(700);
+	await waitForActiveNoteAtBeginning('Main.md');
+	assert.equal(await page.locator('.htoc-popup').count(), 0, 'sticky title navigation closes the table of contents');
+	assert.equal(await page.locator('.hover-popover').count(), 0, 'sticky title navigation leaves no page preview');
+	await page.screenshot({ path: `${out}/sticky-title-click.png` });
 
 	step('clicking a sticky heading jumps to it');
+	await scrollToLine(lineOf('Setup') + 3);
+	await page.waitForFunction(() => document.querySelector('.workspace-leaf.mod-active .htoc-sticky-row:last-child .htoc-sticky-text')?.textContent === 'Setup', null, { timeout: 3000 });
 	await page.locator('.workspace-leaf.mod-active .htoc-sticky-row').last().locator('.htoc-sticky-text').click();
 	await page.waitForTimeout(700);
 	const back = await page.evaluate(() => (globalThis as any).app.workspace.getMostRecentLeaf().view.currentMode.getScroll());

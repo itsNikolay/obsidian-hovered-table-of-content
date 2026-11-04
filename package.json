@@ -16,6 +16,7 @@
 		"docker:check": "node scripts/run-docker.mjs check",
 		"docker:e2e": "node scripts/run-docker.mjs e2e",
 		"docker:demo": "node scripts/run-docker.mjs demo",
+		"docker:demo:title": "node scripts/run-docker.mjs demo-title",
 		"scan:virustotal": "node --experimental-strip-types scripts/scan-virustotal.mts",
 		"version": "node version-bump.mjs && git add manifest.json versions.json"
 	},

@@ -13,6 +13,8 @@ export interface TocHost {
 	/** Path of the note a link points to, or null when it does not resolve to a markdown note. */
 	resolveLink(linktext: string, sourcePath: string): string | null;
 	openHeading(path: string, heading: Heading, newTab: boolean): void;
+	/** Opens the whole note at `path` from its beginning, in a new tab when `newTab`. */
+	openNote(path: string, newTab: boolean): void;
 	openLink(linktext: string, sourcePath: string, newTab: boolean): void;
 	/** Lets hovering `link` show Obsidian's page preview of the linked note. */
 	bindPagePreview(link: HTMLElement, linktext: string, sourcePath: string): PagePreview;
@@ -79,6 +81,13 @@ export class TocController {
 		const title = win.createDiv();
 		title.className = 'htoc-toc-title';
 		title.textContent = source.title ?? this.host.getTitle(source.path);
+		// The title always previews the note that owns the table of contents, not the displayed text.
+		const pagePreview = this.host.bindPagePreview(title, source.path, source.path);
+		popup.onClose(() => pagePreview.hide());
+		title.addEventListener('click', (event) => {
+			this.popups.closeAll();
+			this.host.openNote(source.path, isModEvent(event));
+		});
 		popup.contentEl.append(title);
 
 		const headings = source.headings();

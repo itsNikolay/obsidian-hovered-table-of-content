@@ -1,11 +1,11 @@
-// Builds the test image and runs one of the entrypoint modes (unit, check, e2e, demo).
+// Builds the test image and runs one of the entrypoint modes (unit, check, e2e, demo, demo-title).
 // The container has no network and only writes screenshots/reports to artifacts/docker.
 import { spawnSync } from 'node:child_process';
 import { copyFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const mode = process.argv[2] || 'check';
-if (!['unit', 'check', 'e2e', 'demo'].includes(mode)) throw new Error('Expected unit, check, e2e or demo');
+if (!['unit', 'check', 'e2e', 'demo', 'demo-title'].includes(mode)) throw new Error('Expected unit, check, e2e, demo or demo-title');
 const out = resolve('artifacts/docker');
 mkdirSync(out, { recursive: true });
 const image = 'hovered-table-of-content-test';

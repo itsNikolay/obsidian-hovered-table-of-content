@@ -1,4 +1,5 @@
 // Records the README demo GIF in the real Linux Obsidian app inside Docker (see docker/entrypoint.sh).
+// With `--title`, records the focused linked-note table-of-contents title preview instead (docker:demo:title).
 // Uses a synthetic, disposable vault; never touches the host Obsidian or a personal vault.
 import { chromium, type Browser, type Locator, type Page } from 'playwright';
 import type { ChildProcess } from 'node:child_process';
@@ -8,7 +9,10 @@ import assert from 'node:assert/strict';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-if (process.env.HTOC_DOCKER !== '1') throw new Error('Run this through npm run docker:demo. Host Obsidian is never launched.');
+const TITLE_MODE = process.argv.includes('--title');
+if (process.env.HTOC_DOCKER !== '1') {
+	throw new Error(`Run this through npm run ${TITLE_MODE ? 'docker:demo:title' : 'docker:demo'}. Host Obsidian is never launched.`);
+}
 
 const PLUGIN_ID = 'hovered-table-of-content';
 const WIDTH = 1200, HEIGHT = 760, GIF_WIDTH = 900, FPS = 10;
@@ -28,40 +32,77 @@ const prose = (topic: string, count: number) => Array.from({ length: count }, (_
 	`Write down what you changed, why it matters and who should look at it next.`,
 	`Small, frequent updates are easier to follow than one large batch (note ${i + 1}).`,
 ].join(' ')).join('\n\n');
-const handbook = [
-	// The inline title already shows the note name.
-	'# Overview',
-	'Everything a new teammate needs in one note: how to get set up, how work flows and how we ship.',
-	prose('onboarding', 2),
-	'## Getting started',
-	'New here? Skim the [[Glossary]] first, then follow the steps below.',
-	prose('setup', 2),
-	'### Install',
-	'- Clone the repository\n- Install the dependencies\n- Run the test suite once',
-	prose('install', 3),
-	'### Configure',
-	'Copy the example settings and fill in your own values.',
-	prose('configure', 3),
-	'## Workflow',
-	prose('planning', 2),
-	'### Branches',
-	'One branch per change, named after the ticket.',
-	prose('branching', 4),
-	'### Reviews',
-	'Every change gets at least one review before it lands.',
-	prose('review', 4),
-	'## Release',
-	prose('release', 4),
-	'## FAQ',
-	prose('support', 4),
-].join('\n\n');
-await writeFile(`${vault}/Project Handbook.md`, handbook + '\n');
-await writeFile(`${vault}/Glossary.md`, [
-	'# Glossary', 'Words we use every day.',
-	'## Build', 'A versioned bundle of the plugin, ready to install.',
-	'## Release train', 'Every second Tuesday the main branch is tagged and shipped. Missed it? Catch the next one.',
-	'## Vault', 'A folder of Markdown notes that Obsidian opens as one workspace.',
-].join('\n\n') + '\n');
+
+if (TITLE_MODE) {
+	// A short note with one link, and a long linked note whose native page preview needs real scrolling.
+	const demoNote = [
+		'Start with the [[Field Guide]] for the complete team reference.',
+		'Hover the T after the link to open the table of contents of the linked note.',
+		'## Notes',
+		prose('planning', 2),
+		'## Checklist',
+		prose('check', 2),
+	].join('\n\n');
+	const fieldGuide = [
+		'# Field Guide',
+		'A shared reference for how the team plans, builds, reviews and ships work.',
+		'Back to [[Demo Note]] for the short version.',
+		'## Getting started',
+		prose('onboarding', 2),
+		'## Setup',
+		prose('setup', 2),
+		'## Daily workflow',
+		prose('workflow', 3),
+		'## Reviews',
+		prose('review', 3),
+		'## Release checklist',
+		prose('release', 3),
+		'## Troubleshooting',
+		prose('troubleshooting', 3),
+		'## FAQ',
+		prose('support', 3),
+		'## Appendix',
+		prose('appendix', 2),
+		'End of the field guide.',
+	].join('\n\n');
+	await writeFile(`${vault}/Demo Note.md`, demoNote + '\n');
+	await writeFile(`${vault}/Field Guide.md`, fieldGuide + '\n');
+} else {
+	const handbook = [
+		// The inline title already shows the note name.
+		'# Overview',
+		'Everything a new teammate needs in one note: how to get set up, how work flows and how we ship.',
+		prose('onboarding', 2),
+		'## Getting started',
+		'New here? Skim the [[Glossary]] first, then follow the steps below.',
+		prose('setup', 2),
+		'### Install',
+		'- Clone the repository\n- Install the dependencies\n- Run the test suite once',
+		prose('install', 3),
+		'### Configure',
+		'Copy the example settings and fill in your own values.',
+		prose('configure', 3),
+		'## Workflow',
+		prose('planning', 2),
+		'### Branches',
+		'One branch per change, named after the ticket.',
+		prose('branching', 4),
+		'### Reviews',
+		'Every change gets at least one review before it lands.',
+		prose('review', 4),
+		'## Release',
+		prose('release', 4),
+		'## FAQ',
+		prose('support', 4),
+	].join('\n\n');
+	await writeFile(`${vault}/Project Handbook.md`, handbook + '\n');
+	await writeFile(`${vault}/Glossary.md`, [
+		'# Glossary', 'Words we use every day.',
+		'## Build', 'A versioned bundle of the plugin, ready to install.',
+		'## Release train', 'Every second Tuesday the main branch is tagged and shipped. Missed it? Catch the next one.',
+		'## Vault', 'A folder of Markdown notes that Obsidian opens as one workspace.',
+	].join('\n\n') + '\n');
+}
 
 let app: ChildProcess | undefined, recorder: ChildProcess | undefined;
 let browser: Browser | undefined, page: Page | undefined;
@@ -143,115 +184,282 @@ try {
 		assert.equal(spawnSync('xdotool', args).status, 0, 'Cannot size Obsidian window');
 	await trust.click();
 	await page.waitForFunction(() => (globalThis as any).app?.vault?.getName() === 'htoc-vault', null, { timeout: 60000 });
-	await page.evaluate(async (id) => {
+	const initialNote = TITLE_MODE ? 'Demo Note.md' : 'Project Handbook.md';
+	await page.evaluate(async ({ id, path }) => {
 		const g = globalThis as any;
 		await g.app.plugins.enablePluginAndSave(id);
 		const leaf = g.app.workspace.getLeaf(false);
-		await leaf.openFile(g.app.vault.getAbstractFileByPath('Project Handbook.md'), { state: { mode: 'preview' } });
+		await leaf.openFile(g.app.vault.getAbstractFileByPath(path), { state: { mode: 'preview' } });
 		g.app.workspace.leftSplit.collapse();
 		g.app.workspace.rightSplit.collapse();
-	}, PLUGIN_ID);
+	}, { id: PLUGIN_ID, path: initialNote });
 	await page.getByRole('button', { name: 'Allow', exact: true }).first().click({ timeout: 5000 }).catch(() => {});
 	await page.bringToFront();
-	await page.waitForFunction(() => (globalThis as any).app.metadataCache.getCache('Project Handbook.md')?.headings?.length === 9, null, { timeout: 15000 });
-	await page.evaluate(() => {
+	await page.waitForFunction(({ path, count }) => (globalThis as any).app.metadataCache.getCache(path)?.headings?.length === count,
+		{ path: initialNote, count: TITLE_MODE ? 2 : 9 }, { timeout: 15000 });
+	if (TITLE_MODE) {
+		await page.waitForFunction(() => (globalThis as any).app.metadataCache.getCache('Field Guide.md')?.headings?.length === 9,
+			null, { timeout: 15000 });
+	}
+	await page.evaluate((path) => {
 		const leaf = (globalThis as any).app.workspace.getMostRecentLeaf();
-		return leaf.setViewState({ type: 'markdown', state: { file: 'Project Handbook.md', mode: 'preview' } });
-	});
+		return leaf.setViewState({ type: 'markdown', state: { file: path, mode: 'preview' } });
+	}, initialNote);
 	const button = page.locator('.workspace-leaf.mod-active .htoc-button');
 	await button.waitFor({ timeout: 10000 });
 	await installOverlay();
 	await page.mouse.move(cursor.x, cursor.y);
 	await pause(1000);
 
-	recorder = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'x11grab', '-draw_mouse', '0', '-framerate', '30',
-		'-video_size', `${WIDTH}x${HEIGHT}`, '-i', ':99.0+0,0', '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '12',
-		'-pix_fmt', 'yuv444p', '/tmp/demo.mp4'], { stdio: ['pipe', 'inherit', 'inherit'] });
+	const videoFile = TITLE_MODE ? '/tmp/toc-title-preview.mp4' : '/tmp/demo.mp4';
+	recorder = spawn('ffmpeg', TITLE_MODE
+		? ['-y', '-loglevel', 'error', '-f', 'x11grab', '-draw_mouse', '0', '-framerate', '30',
+			'-video_size', `${WIDTH}x${HEIGHT}`, '-i', ':99.0+0,0', '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '18',
+			'-pix_fmt', 'yuv420p', '-movflags', '+faststart', videoFile]
+		: ['-y', '-loglevel', 'error', '-f', 'x11grab', '-draw_mouse', '0', '-framerate', '30',
+			'-video_size', `${WIDTH}x${HEIGHT}`, '-i', ':99.0+0,0', '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '12',
+			'-pix_fmt', 'yuv444p', videoFile], { stdio: ['pipe', 'inherit', 'inherit'] });
 	await pause(1200);
 
-	await caption('Hover the T after the note title to see the table of contents');
-	await glideTo(button, 900);
-	const toc = page.locator('.htoc-toc').first();
-	await toc.waitFor({ timeout: 3000 });
-	await pause(1300);
+	if (TITLE_MODE) {
+		// The focused title-preview recording: real hover, real wheel scrolling and real clicks.
+		const mainNote = 'Demo Note.md', linkedNote = 'Field Guide.md', endMarker = 'End of the field guide.';
+		const activeNoteFile = () => page!.evaluate(() => (globalThis as any).app.workspace.getMostRecentLeaf()?.view?.file?.path ?? null);
+		const activeNoteScroll = () => page!.evaluate(() => (globalThis as any).app.workspace.getMostRecentLeaf()?.view?.currentMode?.getScroll?.() ?? null);
+		const waitForActiveNote = (path: string) => page!.waitForFunction(({ path }) => {
+			const g = globalThis as any;
+			const leaf = g.app.workspace.getMostRecentLeaf();
+			return leaf?.view?.file?.path === path && (leaf.view.currentMode?.getScroll?.() ?? Infinity) < 3;
+		}, { path }, { timeout: 5000 });
+		const noteLinkIcons = page.locator('.workspace-leaf.mod-active .markdown-reading-view .htoc-note-link-toc');
+		const noteLinkIcon = noteLinkIcons.first();
+		const toc = page.locator('.htoc-toc').first();
+		const title = toc.locator('.htoc-toc-title');
+		const preview = page.locator('.hover-popover').last();
+		const previewScroller = preview.locator('.markdown-preview-view');
 
-	await caption('Hover a heading to preview its section');
-	await glideTo(toc.locator('.htoc-toc-item', { hasText: 'Getting started' }), 500, 0.3);
-	const preview = page.locator('.htoc-preview').first();
-	await preview.waitFor({ timeout: 3000 });
-	await pause(1500);
+		await caption('Links to other notes get a T with their table of contents');
+		await noteLinkIcon.waitFor({ timeout: 10000 });
+		assert.equal(await noteLinkIcons.count(), 1, 'the link gets one T');
+		const iconBox = (await noteLinkIcon.boundingBox())!;
+		// Approach the T from its right so the pointer does not open the link's own page preview first.
+		await glide(iconBox.x + iconBox.width + 100, iconBox.y + iconBox.height / 2, 700);
+		await glideTo(noteLinkIcon, 350);
+		await toc.waitFor({ timeout: 5000 });
+		assert.equal(await title.textContent(), 'Field Guide', 'the TOC title names the linked note');
+		assert.deepEqual(await toc.locator('.htoc-toc-item').allTextContents(), [
+			'Field Guide', 'Getting started', 'Setup', 'Daily workflow', 'Reviews',
+			'Release checklist', 'Troubleshooting', 'FAQ', 'Appendix',
+		], 'the TOC lists the linked note headings');
+		await pause(600);
+		assert.equal(await page.locator('.hover-popover').count(), 0, 'the T opens the TOC without a page preview');
+		await pause(1200);
+		await page.screenshot({ path: `${out}/toc-title-linked-toc.png` });
 
-	await caption('Hover a link to see the linked note');
-	const link = preview.locator('a.internal-link', { hasText: 'Glossary' }).first();
-	const linkBox = (await link.boundingBox())!;
-	await glide(linkBox.x + linkBox.width + 60, cursor.y, 400); // into the preview first, so the TOC list is not crossed
-	await glideTo(link, 500, 0.4);
-	const pagePreview = page.locator('.hover-popover', { hasText: 'Release train' });
-	await pagePreview.waitFor({ timeout: 5000 });
-	await pause(1600);
+		await caption('Hover the TOC title to preview the whole linked note');
+		await glideTo(title, 650, 0.4);
+		await preview.waitFor({ timeout: 5000 });
+		await preview.getByText('A shared reference for how the team plans, builds, reviews and ships work.', { exact: true })
+			.waitFor({ timeout: 5000 });
+		assert.equal(await toc.isVisible(), true, 'the TOC stays open when its title preview opens');
+		await pause(1400);
+		await page.screenshot({ path: `${out}/toc-title-preview.png` });
 
-	await caption('Page previews get a T with the table of contents');
-	await glideTo(pagePreview.locator('.htoc-preview-button'), 700);
-	const previewToc = page.locator('.htoc-toc', { hasText: 'Release train' });
-	await previewToc.waitFor({ timeout: 3000 });
-	await pause(900);
-	await glideTo(previewToc.locator('.htoc-toc-item', { hasText: 'Release train' }), 500, 0.3);
-	await page.locator('.htoc-preview', { hasText: 'Every second Tuesday' }).waitFor({ timeout: 3000 });
-	await pause(2000);
+		await caption('Move into the preview and scroll the whole note');
+		const previewBox = (await preview.boundingBox())!;
+		await glide(previewBox.x + previewBox.width / 2, previewBox.y + previewBox.height / 2, 650);
+		await pause(800);
+		assert.equal(await preview.evaluate((el) => el.matches(':hover')), true, 'the pointer is inside the page preview');
+		assert.equal(await toc.isVisible(), true, 'the TOC stays open while the page preview is hovered');
+		assert.ok(await previewScroller.evaluate((el) => el.scrollHeight > el.clientHeight), 'the page preview is scrollable');
+		const scrollBefore = await previewScroller.evaluate((el) => el.scrollTop);
+		await page.mouse.wheel(0, 600);
+		await pause(500);
+		const scrollAfter = await previewScroller.evaluate((el) => el.scrollTop);
+		assert.ok(scrollAfter > scrollBefore, `the preview scrolls with the wheel, got ${scrollBefore} -> ${scrollAfter}`);
+		// The native preview renders lazily, so scroll with the wheel and wait until the end of the note is on screen.
+		const endVisible = async () => {
+			const marker = preview.getByText(endMarker, { exact: true });
+			if (!(await marker.isVisible())) return false;
+			const markerBox = await marker.boundingBox();
+			if (!markerBox) return false;
+			const viewport = await previewScroller.evaluate((el) => {
+				const rect = el.getBoundingClientRect();
+				return {
+					left: rect.left + el.clientLeft, top: rect.top + el.clientTop,
+					width: el.clientWidth, height: el.clientHeight,
+				};
+			});
+			return markerBox.x >= viewport.left && markerBox.y >= viewport.top
+				&& markerBox.x + markerBox.width <= viewport.left + viewport.width
+				&& markerBox.y + markerBox.height <= viewport.top + viewport.height;
+		};
+		for (let attempt = 0; attempt < 60 && !(await endVisible()); attempt++) {
+			const { top, clientHeight, scrollHeight } = await previewScroller.evaluate((el) => ({
+				top: el.scrollTop, clientHeight: el.clientHeight, scrollHeight: el.scrollHeight,
+			}));
+			const remaining = scrollHeight - top - clientHeight;
+			if (remaining > 2) {
+				await page.mouse.wheel(0, Math.min(500, remaining));
+			} else {
+				// At the estimated end: give the renderer time, then ask it for the final block.
+				await pause(300);
+				if (!(await endVisible())) await previewScroller.evaluate((el) => el.scrollTo(0, el.scrollHeight));
+			}
+			await pause(250);
+		}
+		await preview.getByText(endMarker, { exact: true }).waitFor({ timeout: 10000 });
+		assert.equal(await endVisible(), true, 'the final marker is fully inside the preview viewport');
+		assert.equal(await preview.evaluate((el) => el.matches(':hover')), true, 'the pointer stayed in the preview while scrolling');
+		assert.equal(await toc.isVisible(), true, 'the TOC stays open after scrolling the full preview');
+		await pause(1400);
+		await page.screenshot({ path: `${out}/toc-title-preview-end.png` });
 
-	await caption('Links in the note get a T too');
-	await glide(WIDTH * 0.12, HEIGHT * 0.85, 600);
-	await page.waitForFunction(() => !document.querySelector('.htoc-popup, .hover-popover'), null, { timeout: 5000 });
-	const noteLinkIcon = page.locator('.workspace-leaf.mod-active .markdown-reading-view .htoc-note-link-toc').first();
-	await glideTo(noteLinkIcon, 800);
-	const noteLinkToc = page.locator('.htoc-toc', { hasText: 'Release train' });
-	await noteLinkToc.waitFor({ timeout: 3000 });
-	await pause(900);
-	await glideTo(noteLinkToc.locator('.htoc-toc-item', { hasText: 'Build' }), 500, 0.3);
-	await page.locator('.htoc-preview', { hasText: 'A versioned bundle' }).waitFor({ timeout: 3000 });
-	await pause(1800);
+		await caption('Click the title to open the linked note');
+		// Keep the return trip short so the TOC cannot close between the preview and its title.
+		await glideTo(title, 300, 0.4);
+		await pause(400);
+		await title.click();
+		await page.waitForTimeout(700);
+		await waitForActiveNote(linkedNote);
+		assert.equal(await activeNoteFile(), linkedNote, 'the title click opens the linked note');
+		assert.equal(await page.evaluate(() => (globalThis as any).app.workspace.getLeavesOfType('markdown').length), 1,
+			'the title click navigates in the current tab');
+		assert.equal(await page.locator('.htoc-popup').count(), 0, 'title navigation closes the TOC');
+		assert.equal(await page.locator('.hover-popover').count(), 0, 'title navigation closes the title preview');
+		await pause(1200);
+		await page.screenshot({ path: `${out}/toc-title-click.png` });
 
-	await caption('Click a heading to jump to it');
-	await glide(WIDTH * 0.12, HEIGHT * 0.85, 600);
-	await pause(500);
-	await glideTo(button, 700);
-	await toc.waitFor({ timeout: 3000 });
-	await glideTo(page.locator('.htoc-toc .htoc-toc-item', { hasText: 'Install' }), 500, 0.3);
-	await pause(500);
-	await page.mouse.down();
-	await page.mouse.up();
-	await glide(WIDTH * 0.45, HEIGHT * 0.5, 500);
-	await pause(1500);
+		await caption('');
+		const backLink = page.locator('.workspace-leaf.mod-active .markdown-reading-view a.internal-link', { hasText: 'Demo Note' }).first();
+		await backLink.waitFor({ timeout: 5000 });
+		await glideTo(backLink, 550, 0.3);
+		await backLink.click();
+		await page.waitForTimeout(600);
+		await waitForActiveNote(mainNote);
+		await pause(500);
 
-	await caption('Sticky headings stay on top while you scroll');
-	const stickyRow = (text: string) => page!.locator('.workspace-leaf.mod-active .htoc-sticky-row', { has: page!.locator('.htoc-sticky-text', { hasText: text }) });
-	for (let i = 0; i < 20 && await stickyRow('Branches').count() === 0; i++) await scrollBy(150, 5);
-	await scrollBy(150, 5);
-	await pause(1400);
+		await caption('Ctrl-click the title to open it in a new tab');
+		await noteLinkIcon.waitFor({ timeout: 5000 });
+		await glideTo(noteLinkIcon, 700);
+		await toc.waitFor({ timeout: 5000 });
+		await glideTo(title, 450, 0.4);
+		await pause(600);
+		const leavesBefore = await page.evaluate(() => (globalThis as any).app.workspace.getLeavesOfType('markdown').length);
+		await title.click({ modifiers: ['Control'] });
+		await page.waitForFunction(({ before, path }) => {
+			const g = globalThis as any;
+			return g.app.workspace.getLeavesOfType('markdown').length === before + 1
+				&& g.app.workspace.getMostRecentLeaf()?.view?.file?.path === path;
+		}, { before: leavesBefore, path: linkedNote }, { timeout: 5000 });
+		assert.equal(await page.locator('.htoc-popup').count(), 0, 'Ctrl-click closes the TOC');
+		assert.equal(await activeNoteFile(), linkedNote, 'the new tab shows the linked note');
+		assert.ok(await activeNoteScroll() !== null, 'the new tab renders the linked note');
+		await pause(1400);
+		await page.screenshot({ path: `${out}/toc-title-ctrl-click.png` });
+		await caption('');
+		await pause(800);
+	} else {
+		await caption('Hover the T after the note title to see the table of contents');
+		await glideTo(button, 900);
+		const toc = page.locator('.htoc-toc').first();
+		await toc.waitFor({ timeout: 3000 });
+		await pause(1300);
 
-	await caption('The T on a sticky heading lists its subheadings');
-	await glideTo(stickyRow('Workflow').locator('.htoc-sticky-toc'), 700);
-	await page.locator('.htoc-toc').first().waitFor({ timeout: 3000 });
-	await pause(1800);
+		await caption('Hover a heading to preview its section');
+		await glideTo(toc.locator('.htoc-toc-item', { hasText: 'Getting started' }), 500, 0.3);
+		const preview = page.locator('.htoc-preview').first();
+		await preview.waitFor({ timeout: 3000 });
+		await pause(1500);
 
-	await caption('Click a sticky heading to jump back to it');
-	await glideTo(stickyRow('Workflow').locator('.htoc-sticky-text'), 600, 0.2);
-	await pause(500);
-	await page.mouse.down();
-	await page.mouse.up();
-	await pause(1800);
-	await caption('');
-	await pause(800);
+		await caption('Hover a link to see the linked note');
+		const link = preview.locator('a.internal-link', { hasText: 'Glossary' }).first();
+		const linkBox = (await link.boundingBox())!;
+		await glide(linkBox.x + linkBox.width + 60, cursor.y, 400); // into the preview first, so the TOC list is not crossed
+		await glideTo(link, 500, 0.4);
+		const pagePreview = page.locator('.hover-popover', { hasText: 'Release train' });
+		await pagePreview.waitFor({ timeout: 5000 });
+		await pause(1600);
+
+		await caption('Page previews get a T with the table of contents');
+		await glideTo(pagePreview.locator('.htoc-preview-button'), 700);
+		const previewToc = page.locator('.htoc-toc', { hasText: 'Release train' });
+		await previewToc.waitFor({ timeout: 3000 });
+		await pause(900);
+		await glideTo(previewToc.locator('.htoc-toc-item', { hasText: 'Release train' }), 500, 0.3);
+		await page.locator('.htoc-preview', { hasText: 'Every second Tuesday' }).waitFor({ timeout: 3000 });
+		await pause(2000);
+
+		await caption('Links in the note get a T too');
+		await glide(WIDTH * 0.12, HEIGHT * 0.85, 600);
+		await page.waitForFunction(() => !document.querySelector('.htoc-popup, .hover-popover'), null, { timeout: 5000 });
+		const noteLinkIcon = page.locator('.workspace-leaf.mod-active .markdown-reading-view .htoc-note-link-toc').first();
+		await glideTo(noteLinkIcon, 800);
+		const noteLinkToc = page.locator('.htoc-toc', { hasText: 'Release train' });
+		await noteLinkToc.waitFor({ timeout: 3000 });
+		await pause(900);
+		await glideTo(noteLinkToc.locator('.htoc-toc-item', { hasText: 'Build' }), 500, 0.3);
+		await page.locator('.htoc-preview', { hasText: 'A versioned bundle' }).waitFor({ timeout: 3000 });
+		await pause(1800);
+
+		await caption('Click a heading to jump to it');
+		await glide(WIDTH * 0.12, HEIGHT * 0.85, 600);
+		await pause(500);
+		await glideTo(button, 700);
+		await toc.waitFor({ timeout: 3000 });
+		await glideTo(page.locator('.htoc-toc .htoc-toc-item', { hasText: 'Install' }), 500, 0.3);
+		await pause(500);
+		await page.mouse.down();
+		await page.mouse.up();
+		await glide(WIDTH * 0.45, HEIGHT * 0.5, 500);
+		await pause(1500);
+
+		await caption('Sticky headings stay on top while you scroll');
+		const stickyRow = (text: string) => page!.locator('.workspace-leaf.mod-active .htoc-sticky-row', { has: page!.locator('.htoc-sticky-text', { hasText: text }) });
+		for (let i = 0; i < 20 && await stickyRow('Branches').count() === 0; i++) await scrollBy(150, 5);
+		await scrollBy(150, 5);
+		await pause(1400);
+
+		await caption('The T on a sticky heading lists its subheadings');
+		await glideTo(stickyRow('Workflow').locator('.htoc-sticky-toc'), 700);
+		await page.locator('.htoc-toc').first().waitFor({ timeout: 3000 });
+		await pause(1800);
+
+		await caption('Click a sticky heading to jump back to it');
+		await glideTo(stickyRow('Workflow').locator('.htoc-sticky-text'), 600, 0.2);
+		await pause(500);
+		await page.mouse.down();
+		await page.mouse.up();
+		await pause(1800);
+		await caption('');
+		await pause(800);
+	}
 
 	recorder.stdin!.end('q');
 	await new Promise((resolve) => recorder!.once('exit', resolve));
-	const gif = spawnSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', '/tmp/demo.mp4', '-vf',
-		`fps=${FPS},scale=${GIF_WIDTH}:-1:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle`,
-		'-loop', '0', `${out}/demo.gif`], { stdio: 'inherit' });
-	assert.equal(gif.status, 0, 'GIF conversion failed');
-	console.log(`Demo written to ${out}/demo.gif`);
+	if (TITLE_MODE) {
+		const probe = spawnSync('ffprobe', ['-v', 'error', '-select_streams', 'v:0',
+			'-show_entries', 'stream=codec_name,pix_fmt,width,height:format=duration', '-of', 'json', videoFile], { encoding: 'utf8' });
+		assert.equal(probe.status, 0, 'ffprobe cannot read the title demo video');
+		const info = JSON.parse(probe.stdout) as { streams: { codec_name: string; pix_fmt: string; width: number; height: number }[]; format: { duration: string } };
+		const stream = info.streams[0]!;
+		assert.equal(stream.codec_name, 'h264', 'the title demo video is H.264');
+		assert.equal(stream.pix_fmt, 'yuv420p', 'the title demo video is yuv420p');
+		assert.equal(stream.width, WIDTH);
+		assert.equal(stream.height, HEIGHT);
+		const duration = Number(info.format.duration);
+		assert.ok(Number.isFinite(duration) && duration > 0, 'the title demo video has a positive duration');
+		await copyFile(videoFile, `${out}/toc-title-preview.mp4`);
+		console.log(`Title demo written to ${out}/toc-title-preview.mp4 (${duration.toFixed(1)}s, ${stream.codec_name}/${stream.pix_fmt})`);
+	} else {
+		const gif = spawnSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', videoFile, '-vf',
+			`fps=${FPS},scale=${GIF_WIDTH}:-1:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle`,
+			'-loop', '0', `${out}/demo.gif`], { stdio: 'inherit' });
+		assert.equal(gif.status, 0, 'GIF conversion failed');
+		console.log(`Demo written to ${out}/demo.gif`);
+	}
 } catch (error) {
-	if (page) await page.screenshot({ path: `${out}/demo-failure.png` }).catch(() => {});
+	if (page) await page.screenshot({ path: `${out}/${TITLE_MODE ? 'toc-title-failure' : 'demo-failure'}.png` }).catch(() => {});
 	failure = error;
 } finally {
 	if (recorder && recorder.exitCode === null) recorder.kill('SIGINT');

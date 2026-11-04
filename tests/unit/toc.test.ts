@@ -30,14 +30,27 @@ interface PagePreview {
 	release: ReturnType<typeof vi.fn>;
 }
 
-function makeHost(): TocHost & { opened: unknown[]; links: unknown[]; pagePreviews: PagePreview[] } {
+interface OpenedNote {
+	path: string;
+	newTab: boolean;
+}
+
+function makeHost(): TocHost & {
+	opened: unknown[];
+	links: unknown[];
+	pagePreviews: PagePreview[];
+	notes: OpenedNote[];
+	openNote(path: string, newTab: boolean): void;
+} {
 	const opened: unknown[] = [];
 	const links: unknown[] = [];
 	const pagePreviews: PagePreview[] = [];
+	const notes: OpenedNote[] = [];
 	return {
 		opened,
 		links,
 		pagePreviews,
+		notes,
 		getHeadings: (path) => (files[path] ? headingsOf(files[path]) : []),
 		getTitle: (path) => path.replace(/\.md$/, ''),
 		readFile: (path) => Promise.resolve(files[path] ?? ''),
@@ -63,6 +76,7 @@ function makeHost(): TocHost & { opened: unknown[]; links: unknown[]; pagePrevie
 		resolveLink: (linktext) => (files[`${linktext}.md`] !== undefined ? `${linktext}.md` : null),
 		openHeading: (path, heading, newTab) => opened.push({ path, line: heading.line, newTab }),
 		openLink: (linktext, sourcePath, newTab) => links.push({ linktext, sourcePath, newTab }),
+		openNote: (path, newTab) => notes.push({ path, newTab }),
 		bindPagePreview: (link, linktext, sourcePath) => {
 			const release = vi.fn();
 			const binding = { link, linktext, sourcePath, hide: vi.fn(), keepOpen: vi.fn(() => release), release };
@@ -107,6 +121,76 @@ describe('TocController', () => {
 		expect(items.map((i) => i.textContent)).toEqual(['Main', 'Setup', 'Install', 'Usage']);
 		expect(items.map((i) => i.dataset.depth)).toEqual(['0', '1', '2', '1']);
 		expect(q('.htoc-toc .htoc-toc-title')[0]!.textContent).toBe('Main');
+	});
+
+	test('hovering the title previews the whole owning note', async () => {
+		attachMain();
+		await hover(button);
+		const title = q('.htoc-toc .htoc-toc-title')[0]!;
+		expect(host.pagePreviews).toHaveLength(1);
+		const [bound] = host.pagePreviews;
+		expect(bound!.link).toBe(title);
+		expect([bound!.linktext, bound!.sourcePath]).toEqual(['Main.md', 'Main.md']);
+	});
+
+	test('a title that shows a section still previews the whole owning note', async () => {
+		toc.attachToc(button, { path: 'Maps/Map in folder.md', title: 'Setup', headings: () => [] }, { side: 'below', align: 'end' });
+		await hover(button);
+		expect(q('.htoc-toc .htoc-toc-title')[0]!.textContent).toBe('Setup');
+		expect(host.pagePreviews).toHaveLength(1);
+		const [bound] = host.pagePreviews;
+		expect([bound!.linktext, bound!.sourcePath]).toEqual(['Maps/Map in folder.md', 'Maps/Map in folder.md']);
+	});
+
+	test('closing the table of contents releases its title page preview', async () => {
+		attachMain();
+		await hover(button);
+		const [bound] = host.pagePreviews;
+		expect(bound!.hide).not.toHaveBeenCalled();
+		manager.closeAll();
+		expect(bound!.hide).toHaveBeenCalledOnce();
+	});
+
+	test('clicking the title opens the owning note from its beginning in the current tab', async () => {
+		attachMain();
+		await hover(button);
+		q('.htoc-toc .htoc-toc-title')[0]!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+		expect(host.notes).toEqual([{ path: 'Main.md', newTab: false }]);
+		// The title opens the whole note, not one of its headings.
+		expect(host.opened).toEqual([]);
+	});
+
+	test('Ctrl-click and Cmd-click open the owning note in a new tab', async () => {
+		attachMain();
+		for (const modifier of [{ ctrlKey: true }, { metaKey: true }]) {
+			await hover(button);
+			q('.htoc-toc .htoc-toc-title')[0]!.dispatchEvent(new MouseEvent('click', { bubbles: true, ...modifier }));
+		}
+		expect(host.notes).toEqual([
+			{ path: 'Main.md', newTab: true },
+			{ path: 'Main.md', newTab: true },
+		]);
+	});
+
+	test('a custom title of a note in a folder opens that whole note', async () => {
+		toc.attachToc(button, { path: 'Maps/Map in folder.md', title: 'Setup', headings: () => [] }, { side: 'below', align: 'end' });
+		await hover(button);
+		const title = q('.htoc-toc .htoc-toc-title')[0]!;
+		expect(title.textContent).toBe('Setup');
+		title.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+		expect(host.notes).toEqual([{ path: 'Maps/Map in folder.md', newTab: false }]);
+		expect(host.opened).toEqual([]);
+	});
+
+	test('clicking the title closes the table of contents and its previews, and releases its page preview', async () => {
+		attachMain();
+		await hover(button);
+		await hover(q('.htoc-toc-item')[1]!);
+		expect(q('.htoc-popup')).toHaveLength(2);
+		const titlePreview = host.pagePreviews[0]!;
+		q('.htoc-toc .htoc-toc-title')[0]!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+		expect(q('.htoc-popup')).toHaveLength(0);
+		expect(titlePreview.hide).toHaveBeenCalledOnce();
 	});
 
 	test('headings are numbered within their section, or with the numbers of their parents', async () => {
@@ -242,28 +326,27 @@ describe('TocController', () => {
 		attachMain();
 		await hover(button);
 		await hover(q('.htoc-toc-item')[1]!);
-		expect(host.pagePreviews).toHaveLength(1);
-		const [bound] = host.pagePreviews;
-		expect(bound!.link).toBe(q('.htoc-preview a.internal-link')[0]);
-		expect([bound!.linktext, bound!.sourcePath]).toEqual(['Other', 'Main.md']);
-		expect(bound!.hide).not.toHaveBeenCalled();
+		const bound = host.pagePreviews.find((preview) => preview.link.matches('a.internal-link'))!;
+		expect(bound.link).toBe(q('.htoc-preview a.internal-link')[0]);
+		expect([bound.linktext, bound.sourcePath]).toEqual(['Other', 'Main.md']);
+		expect(bound.hide).not.toHaveBeenCalled();
 		manager.closeAll();
-		expect(bound!.hide).toHaveBeenCalledOnce();
+		expect(bound.hide).toHaveBeenCalledOnce();
 	});
 
 	test("the T next to a link keeps that link's page preview open while its table of contents is open", async () => {
 		attachMain();
 		await hover(button);
 		await hover(q('.htoc-toc-item')[1]!);
-		const [bound] = host.pagePreviews;
+		const bound = host.pagePreviews.find((preview) => preview.link.matches('a.internal-link'))!;
 		const icon = q('.htoc-preview .htoc-link-toc')[0]!;
 		await hover(icon);
-		expect(bound!.keepOpen).toHaveBeenCalledOnce();
-		expect(bound!.release).not.toHaveBeenCalled();
+		expect(bound.keepOpen).toHaveBeenCalledOnce();
+		expect(bound.release).not.toHaveBeenCalled();
 		leave(icon);
 		await vi.advanceTimersByTimeAsync(CLOSE_DELAY);
 		expect(q('.htoc-toc')).toHaveLength(1);
-		expect(bound!.release).toHaveBeenCalledOnce();
+		expect(bound.release).toHaveBeenCalledOnce();
 	});
 
 	test('link icons can be turned off; the page preview still works', async () => {
@@ -274,7 +357,7 @@ describe('TocController', () => {
 		await hover(q('.htoc-toc-item')[1]!);
 		expect(q('.htoc-preview a.internal-link')).toHaveLength(1);
 		expect(q('.htoc-link-toc')).toHaveLength(0);
-		expect(host.pagePreviews).toHaveLength(1);
+		expect(host.pagePreviews.some((preview) => preview.link.matches('a.internal-link'))).toBe(true);
 		linkIcons = true;
 		manager.closeAll();
 		await hover(button);

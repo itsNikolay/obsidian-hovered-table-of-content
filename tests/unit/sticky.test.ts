@@ -13,7 +13,9 @@ const headings: Heading[] = [
 	{ level: 2, heading: 'Beta', line: 8 },
 ];
 
-const host: TocHost = {
+const openedNotes: { path: string; newTab: boolean }[] = [];
+
+const host: TocHost & { openNote(path: string, newTab: boolean): void } = {
 	getHeadings: () => headings,
 	getTitle: () => 'Note',
 	readFile: () => Promise.resolve(''),
@@ -21,6 +23,7 @@ const host: TocHost = {
 	resolveLink: () => null,
 	openHeading: () => {},
 	openLink: () => {},
+	openNote: (path, newTab) => openedNotes.push({ path, newTab }),
 	bindPagePreview: () => ({ hide: () => {}, keepOpen: () => () => {} }),
 };
 
@@ -36,6 +39,7 @@ describe('StickyHeadings', () => {
 	beforeEach(() => {
 		vi.useFakeTimers();
 		document.body.replaceChildren();
+		openedNotes.length = 0;
 		container = document.createElement('div');
 		document.body.append(container);
 		manager = new PopupManager(document);
@@ -143,6 +147,18 @@ describe('StickyHeadings', () => {
 		const items = [...document.body.querySelectorAll('.htoc-toc .htoc-toc-item')].map((i) => i.textContent);
 		expect(items).toEqual(['Alpha one', 'Alpha two']);
 		expect(document.body.querySelector('.htoc-toc .htoc-toc-title')!.textContent).toBe('Alpha bold');
+	});
+
+	test("a sticky heading's custom title opens the whole note from its beginning", async () => {
+		sticky.update(3);
+		rows()[0]!.querySelector<HTMLElement>('.htoc-sticky-toc')!.dispatchEvent(new MouseEvent('mouseenter'));
+		await vi.advanceTimersByTimeAsync(OPEN_DELAY);
+		const title = document.body.querySelector<HTMLElement>('.htoc-toc .htoc-toc-title')!;
+		expect(title.textContent).toBe('Alpha bold');
+		title.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+		expect(openedNotes).toEqual([{ path: 'Note.md', newTab: false }]);
+		// The sticky heading itself is not opened.
+		expect(selected).toEqual([]);
 	});
 
 	test('destroy removes the overlay', () => {

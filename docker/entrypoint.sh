@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# unit:  lint, typecheck, unit tests, build.
-# check: everything from unit, then end-to-end tests against the real Linux Obsidian app.
-# e2e:   build, then only the real Obsidian tests.
-# demo:  build, then record the README demo GIF in the real Obsidian app.
+# unit:       lint, typecheck, unit tests, build.
+# check:      everything from unit, then end-to-end tests against the real Linux Obsidian app.
+# e2e:        build, then only the real Obsidian tests.
+# demo:       build, then record the README demo GIF in the real Obsidian app.
+# demo-title: build, then record the focused linked-note TOC title preview MP4.
 set -euo pipefail
 mode="${1:-check}"
-if [ "$mode" = "e2e" ] || [ "$mode" = "demo" ]; then
+if [ "$mode" = "e2e" ] || [ "$mode" = "demo" ] || [ "$mode" = "demo-title" ]; then
   npm run build
 else
   npm run check
@@ -17,6 +18,8 @@ trap 'kill "$display_pid" 2>/dev/null || true' EXIT
 for _attempt in {1..30}; do [ -S /tmp/.X11-unix/X99 ] && break; sleep 0.1; done
 if [ "$mode" = "demo" ]; then
   node --experimental-strip-types scripts/record-demo.mts
+elif [ "$mode" = "demo-title" ]; then
+  node --experimental-strip-types scripts/record-demo.mts --title
 else
   node --experimental-strip-types scripts/test-obsidian-docker.mts
 fi

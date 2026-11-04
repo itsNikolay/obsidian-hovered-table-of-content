@@ -130,11 +130,17 @@ export default class HoveredTocPlugin extends Plugin {
 	private onHoverLink({ hoverParent, targetEl, linktext, sourcePath }: HoverLinkEvent) {
 		if (!targetEl || this.watchedLinks.has(targetEl)) return;
 		this.watchedLinks.add(targetEl);
+		const owner = this.layers.get(targetEl.doc)?.popups.popupOf(targetEl);
 		this.whenPreviewShown(hoverParent, targetEl, (popover) => {
 			this.watchedLinks.delete(targetEl);
 			if (!popover || this.handledPreviews.has(popover.hoverEl)) return;
+			if (owner && !owner.isOpen) {
+				popover.hide?.();
+				return;
+			}
 			this.handledPreviews.add(popover.hoverEl);
-			this.layerFor(targetEl.doc).popups.popupOf(targetEl)?.hold(popover.hoverEl);
+			owner?.hold(popover.hoverEl);
+			owner?.onClose(() => popover.hide?.());
 			// Without a source path, Obsidian throws on links to notes in folders.
 			const path = this.resolveLink(linktext, sourcePath ?? '');
 			if (this.settings.linkIcons && path) this.decoratePreview(popover, path);

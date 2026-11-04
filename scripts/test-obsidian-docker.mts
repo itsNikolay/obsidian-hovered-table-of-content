@@ -247,6 +247,8 @@ async function runChecks() {
 	await page.screenshot({ path: `${out}/title-preview-nested.png` });
 
 	step('closing the title table of contents releases its page preview');
+	await nestedPagePreview.hover();
+	await page.waitForTimeout(500);
 	await page.keyboard.press('Escape');
 	await page.waitForTimeout(200);
 	await page.keyboard.press('Escape');

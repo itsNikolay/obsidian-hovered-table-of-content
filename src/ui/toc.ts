@@ -17,7 +17,7 @@ export interface TocHost {
 	openNote(path: string, newTab: boolean): void;
 	openLink(linktext: string, sourcePath: string, newTab: boolean): void;
 	/** Lets hovering `link` show Obsidian's page preview of the linked note. */
-	bindPagePreview(link: HTMLElement, linktext: string, sourcePath: string): PagePreview;
+	bindPagePreview(link: HTMLElement, linktext: string, sourcePath: string, anchor?: HTMLElement): PagePreview;
 }
 
 export interface PagePreview {
@@ -82,7 +82,7 @@ export class TocController {
 		title.className = 'htoc-toc-title';
 		title.textContent = source.title ?? this.host.getTitle(source.path);
 		// The title always previews the note that owns the table of contents, not the displayed text.
-		const pagePreview = this.host.bindPagePreview(title, source.path, source.path);
+		const pagePreview = this.host.bindPagePreview(title, source.path, source.path, popup.el);
 		popup.onClose(() => pagePreview.hide());
 		title.addEventListener('click', (event) => {
 			this.popups.closeAll();

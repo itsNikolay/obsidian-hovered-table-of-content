@@ -14,6 +14,7 @@ import type { Heading } from './headings';
 import { normalizeSettings, popoverPlacement, tocNumberFormat, type HoveredTocSettings } from './settings';
 import { HoveredTocSettingTab } from './settings-tab';
 import { PopupManager, type Popup } from './ui/popup';
+import { computePosition } from './ui/position';
 import { TocController, createIcon, type TocHost } from './ui/toc';
 import { ViewDecoration, noteLinkIcons } from './view-decoration';
 
@@ -29,6 +30,7 @@ interface PopoverInternals {
 	setIsFocused?: (focused: boolean) => void;
 	transition?: () => void;
 	hide?: () => void;
+	position?: () => void;
 }
 type Popover = HoverPopover & PopoverInternals;
 
@@ -60,6 +62,7 @@ export default class HoveredTocPlugin extends Plugin {
 	/** Each removes the T icons added to an open Obsidian page preview. */
 	private undecoratePreviews = new Set<() => void>();
 	private watchedLinks = new WeakSet<HTMLElement>();
+	private previewAnchors = new WeakMap<HTMLElement, HTMLElement>();
 	private handledPreviews = new WeakSet<HTMLElement>();
 
 	async onload() {
@@ -139,12 +142,44 @@ export default class HoveredTocPlugin extends Plugin {
 				return;
 			}
 			this.handledPreviews.add(popover.hoverEl);
+			const anchor = this.previewAnchors.get(targetEl);
+			if (anchor) this.positionTitlePreview(popover, anchor);
 			owner?.hold(popover.hoverEl);
 			owner?.onClose(() => popover.hide?.());
 			// Without a source path, Obsidian throws on links to notes in folders.
 			const path = this.resolveLink(linktext, sourcePath ?? '');
 			if (this.settings.linkIcons && path) this.decoratePreview(popover, path);
 		});
+	}
+
+	/** Place title previews beside the entire TOC, including after native content reflows. */
+	private positionTitlePreview(popover: Popover, anchor: HTMLElement) {
+		const { hoverEl } = popover;
+		const win = hoverEl.win as typeof window;
+		const original = popover.position;
+		const position = () => {
+			if (!anchor.isConnected || !hoverEl.isConnected) return;
+			const box = hoverEl.getBoundingClientRect();
+			const { left, top } = computePosition(
+				anchor.getBoundingClientRect(), box,
+				{ width: win.innerWidth, height: win.innerHeight },
+				{ side: 'right', align: 'start' },
+			);
+			hoverEl.style.left = `${left}px`;
+			hoverEl.style.top = `${top}px`;
+		};
+		// Native Page Preview repositions itself while rendering the note.
+		if (original) popover.position = () => { original.call(popover); position(); };
+		const observer = new win.ResizeObserver(position);
+		observer.observe(hoverEl);
+		observer.observe(anchor);
+		win.addEventListener('resize', position);
+		popover.register(() => {
+			observer.disconnect();
+			win.removeEventListener('resize', position);
+			if (original) popover.position = original;
+		});
+		position();
 	}
 
 	/** A T button with the table of contents of the previewed note, and a T after each link to another note in the preview. */
@@ -260,7 +295,8 @@ export default class HoveredTocPlugin extends Plugin {
 			openLink: (linktext, sourcePath, newTab) => {
 				void app.workspace.openLinkText(linktext, sourcePath, newTab);
 			},
-			bindPagePreview: (link, linktext, sourcePath) => {
+			bindPagePreview: (link, linktext, sourcePath, anchor) => {
+				if (anchor) this.previewAnchors.set(link, anchor);
 				const hoverParent: HoverParent = { hoverPopover: null };
 				const current = (): Popover | null => hoverParent.hoverPopover;
 				link.addEventListener('mouseover', (event) => {

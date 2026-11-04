@@ -213,6 +213,12 @@ async function runChecks() {
 	await notePagePreview.waitFor({ timeout: 5000 });
 	await notePagePreview.getByText('Guide paragraph 1. Synthetic text for scrolling.', { exact: true }).waitFor({ timeout: 5000 });
 	assert.equal(await toc.isVisible(), true, 'the table of contents stays open when its title preview opens');
+	await page.waitForTimeout(300);
+	const titleTocBox = (await toc.boundingBox())!;
+	const titlePreviewBox = (await notePagePreview.boundingBox())!;
+	assert.ok(titlePreviewBox.x + titlePreviewBox.width <= titleTocBox.x - 4,
+		'the title preview opens to the left when the table of contents is at the right edge');
+	assert.ok(Math.abs(titlePreviewBox.y - titleTocBox.y) <= 2, 'the title preview aligns with the top of the table of contents');
 	await page.screenshot({ path: `${out}/title-preview.png` });
 
 	step('moving into the title page preview keeps the table of contents open and the preview scrolls');
@@ -255,6 +261,37 @@ async function runChecks() {
 	await page.waitForTimeout(500);
 	assert.equal(await page.locator('.htoc-popup').count(), 0, 'the table of contents closes');
 	assert.equal(await page.locator('.hover-popover').count(), 0, 'no title page preview is left orphaned');
+
+	step('the title preview opens on the right when there is space and follows content resizing');
+	await page.evaluate(async (id) => {
+		const plugin = (globalThis as any).app.plugins.plugins[id];
+		plugin.settings.buttonPosition = 'top-left';
+		await plugin.saveSettings();
+	}, PLUGIN_ID);
+	await moveAway();
+	await button.hover();
+	await toc.waitFor({ timeout: 3000 });
+	await title.hover();
+	await notePagePreview.waitFor({ timeout: 5000 });
+	await page.waitForTimeout(500);
+	const leftTocBox = (await toc.boundingBox())!;
+	const rightPreviewBox = (await notePagePreview.boundingBox())!;
+	assert.ok(rightPreviewBox.x >= leftTocBox.x + leftTocBox.width + 4, 'the title preview opens to the right of the entire TOC');
+	assert.ok(Math.abs(rightPreviewBox.y - leftTocBox.y) <= 2, 'the right preview aligns with the TOC top');
+	await page.screenshot({ path: `${out}/title-preview-right.png` });
+	await notePagePreview.evaluate((el) => { (el as HTMLElement).style.width = '360px'; });
+	await page.waitForTimeout(400);
+	const resizedPreviewBox = (await notePagePreview.boundingBox())!;
+	assert.ok(resizedPreviewBox.x >= leftTocBox.x + leftTocBox.width + 4, 'a resized native preview stays beside the TOC');
+	assert.ok(resizedPreviewBox.x + resizedPreviewBox.width <= (await page.evaluate(() => innerWidth)) - 4, 'the resized preview stays inside the window');
+	await page.keyboard.press('Escape');
+	await page.waitForTimeout(500);
+	await page.evaluate(async (id) => {
+		const plugin = (globalThis as any).app.plugins.plugins[id];
+		plugin.settings.buttonPosition = 'top-right';
+		await plugin.saveSettings();
+	}, PLUGIN_ID);
+	await moveAway();
 
 	step('the title preview honors the Page Preview modifier requirement');
 	await setPagePreviewRequireModifier(true);

@@ -1,6 +1,7 @@
 export interface Placement {
 	side: 'below' | 'above' | 'right' | 'left';
 	align: 'start' | 'center' | 'end';
+	gap?: number;
 }
 
 export interface Rect {
@@ -22,14 +23,14 @@ const MARGIN = 4;
 
 const OPPOSITE = { below: 'above', above: 'below', right: 'left', left: 'right' } as const;
 
-function place(anchor: Rect, size: Size, side: Placement['side'], align: Placement['align']): { left: number; top: number } {
+function place(anchor: Rect, size: Size, side: Placement['side'], align: Placement['align'], gap: number): { left: number; top: number } {
 	if (side === 'below' || side === 'above') {
-		const top = side === 'below' ? anchor.bottom + GAP : anchor.top - GAP - size.height;
+		const top = side === 'below' ? anchor.bottom + gap : anchor.top - gap - size.height;
 		const left =
 			align === 'start' ? anchor.left : align === 'end' ? anchor.right - size.width : anchor.left + anchor.width / 2 - size.width / 2;
 		return { left, top };
 	}
-	const left = side === 'right' ? anchor.right + GAP : anchor.left - GAP - size.width;
+	const left = side === 'right' ? anchor.right + gap : anchor.left - gap - size.width;
 	const top =
 		align === 'start' ? anchor.top : align === 'end' ? anchor.bottom - size.height : anchor.top + anchor.height / 2 - size.height / 2;
 	return { left, top };
@@ -46,9 +47,9 @@ const clamp = (value: number, min: number, max: number) => Math.max(min, Math.mi
 
 /** Viewport coordinates for a popup of `size` next to `anchor`; flips sides when there is no room, then clamps. */
 export function computePosition(anchor: Rect, size: Size, viewport: Size, placement: Placement): { left: number; top: number } {
-	let pos = place(anchor, size, placement.side, placement.align);
+	let pos = place(anchor, size, placement.side, placement.align, placement.gap ?? GAP);
 	if (!fits(pos, size, viewport, placement.side)) {
-		const flipped = place(anchor, size, OPPOSITE[placement.side], placement.align);
+		const flipped = place(anchor, size, OPPOSITE[placement.side], placement.align, placement.gap ?? GAP);
 		if (fits(flipped, size, viewport, OPPOSITE[placement.side])) pos = flipped;
 	}
 	return {

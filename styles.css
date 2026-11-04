@@ -177,10 +177,13 @@
 }
 
 /* Section previews look like Obsidian's own page previews: same size, margins and font size. */
-.htoc-preview {
+.htoc-preview,
+.popover.hover-popover.htoc-title-preview {
+	box-sizing: border-box;
+	height: var(--popover-height);
 	width: calc(var(--popover-width) + 2 * var(--border-width));
 	max-width: 80vw;
-	max-height: var(--popover-height);
+	max-height: calc(100vh - 8px);
 	font-size: var(--popover-font-size);
 }
 

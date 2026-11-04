@@ -157,13 +157,14 @@ export default class HoveredTocPlugin extends Plugin {
 		const { hoverEl } = popover;
 		const win = hoverEl.win as typeof window;
 		const original = popover.position;
+		hoverEl.classList.add('htoc-title-preview');
 		const position = () => {
 			if (!anchor.isConnected || !hoverEl.isConnected) return;
 			const box = hoverEl.getBoundingClientRect();
 			const { left, top } = computePosition(
 				anchor.getBoundingClientRect(), box,
 				{ width: win.innerWidth, height: win.innerHeight },
-				{ side: 'right', align: 'start' },
+				{ side: 'right', align: 'start', gap: 0 },
 			);
 			hoverEl.style.left = `${left}px`;
 			hoverEl.style.top = `${top}px`;
@@ -177,6 +178,7 @@ export default class HoveredTocPlugin extends Plugin {
 		popover.register(() => {
 			observer.disconnect();
 			win.removeEventListener('resize', position);
+			hoverEl.classList.remove('htoc-title-preview');
 			if (original) popover.position = original;
 		});
 		position();

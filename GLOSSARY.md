@@ -15,3 +15,7 @@ _Avoid_: Section preview, when referring to an entire note.
 **Section preview**:
 A preview of a heading, its text, and its subsections within a note.
 _Avoid_: Page preview, when referring to only one section.
+
+**Preview gap**:
+The space between the outer edge of a table of contents popup and the adjacent text preview window.
+_Avoid_: Text padding, which describes spacing inside the preview window.

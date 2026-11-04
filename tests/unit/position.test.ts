@@ -24,6 +24,13 @@ describe('computePosition', () => {
 		expect(computePosition(nearBottom, size, viewport, { side: 'below', align: 'start' }).top).toBe(654);
 	});
 
+	test('places adjoining previews flush on either side and when flipped', () => {
+		expect(computePosition(anchor, size, viewport, { side: 'right', align: 'start', gap: 0 })).toEqual({ left: 420, top: 300 });
+		expect(computePosition(anchor, size, viewport, { side: 'left', align: 'start', gap: 0 })).toEqual({ left: 200, top: 300 });
+		const nearRight = { left: 900, top: 300, right: 920, bottom: 320, width: 20, height: 20 };
+		expect(computePosition(nearRight, size, viewport, { side: 'right', align: 'start', gap: 0 })).toEqual({ left: 700, top: 300 });
+	});
+
 	test('stays inside the viewport', () => {
 		const corner = { left: 0, top: 0, right: 10, bottom: 10, width: 10, height: 10 };
 		expect(computePosition(corner, size, viewport, { side: 'below', align: 'end' })).toEqual({ left: 4, top: 16 });

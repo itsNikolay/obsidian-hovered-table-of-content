@@ -20,6 +20,7 @@ The coordinator executes Docker validation. DSH workers write tests and code, re
 ```sh
 npm run docker:test -- tests/unit/toc.test.ts -t 'clicking the title'
 npm run docker:e2e -- --scenario title-preview
+npm run docker:e2e -- --scenario preview-height
 npm run docker:check
 ```
 
@@ -34,3 +35,5 @@ Use focused checks while iterating and `docker:check` before completion. After a
 `npm run lint:ui` rejects synthetic click dispatches in the E2E and recording scripts and runs as part of the regular lint command and CI. Use Playwright's real pointer clicks for user navigation.
 
 For evidence that text is on screen inside a scrollable preview, use `isFullyInViewport` from `scripts/ui-visibility.mts`. `isVisible()` alone also accepts rendered content outside the viewport. Both the focused E2E scenario and the video recorder use the shared helper.
+
+`preview-height` checks the nested text window across short section, whole-note title and section hovers. It runs after shared app setup and is also included in the full suite.

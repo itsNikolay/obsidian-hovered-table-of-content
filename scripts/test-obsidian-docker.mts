@@ -14,7 +14,7 @@ if (process.env.HTOC_DOCKER !== '1') throw new Error('Run this through npm run d
 
 const args = process.argv.slice(2);
 const scenario = args.length === 0 ? 'full' : args.length === 2 && args[0] === '--scenario' ? args[1] : undefined;
-if (scenario !== 'full' && scenario !== 'title-preview') throw new Error('Unknown E2E scenario. Use full or title-preview.');
+if (scenario !== 'full' && scenario !== 'title-preview' && scenario !== 'preview-height') throw new Error('Unknown E2E scenario. Use full, title-preview or preview-height.');
 
 const PLUGIN_ID = 'hovered-table-of-content';
 const vault = '/tmp/htoc-vault', profile = join(homedir(), '.config', 'obsidian'), out = '/artifacts';
@@ -182,6 +182,52 @@ async function runChecks() {
 	await page.waitForFunction(() => (globalThis as any).app.metadataCache.getCache('Main.md')?.headings?.length === 6, null, { timeout: 15000 });
 	await setMode('preview');
 
+	if (scenario === 'full' || scenario === 'preview-height') {
+		step('nested text previews keep the same height across section and title hovers');
+		await page.locator('.workspace-leaf.mod-active .htoc-button').hover();
+		const outerToc = page.locator('.htoc-toc').first();
+		await outerToc.waitFor();
+		await outerToc.locator('.htoc-toc-item', { hasText: 'Setup' }).hover();
+		const section = page.locator('.htoc-preview').first();
+		await section.waitFor();
+		await section.locator('.htoc-link-toc').first().hover();
+		const innerToc = page.locator('.htoc-toc').nth(1);
+		await innerToc.waitFor();
+		const part = innerToc.locator('.htoc-toc-item', { hasText: 'Other part' });
+		await part.hover();
+		const innerSection = page.locator('.htoc-preview').nth(1);
+		await innerSection.getByText('Other details live here.', { exact: false }).waitFor();
+		await page.waitForTimeout(300);
+		const sectionHeight = (await innerSection.boundingBox())!.height;
+		const nestedTocBox = (await innerToc.boundingBox())!;
+		const nestedTextBox = (await innerSection.boundingBox())!;
+		assert.ok(Math.min(Math.abs(nestedTextBox.x - nestedTocBox.x - nestedTocBox.width),
+			Math.abs(nestedTextBox.x + nestedTextBox.width - nestedTocBox.x)) <= 1,
+			'the nested section preview touches the outside edge of its TOC');
+		await page.screenshot({ path: `${out}/preview-height-section.png` });
+		await innerToc.locator('.htoc-toc-title').hover();
+		const wholeNote = nativePreview('Other intro');
+		await wholeNote.waitFor();
+		await page.waitForTimeout(800);
+		const wholeHeight = (await wholeNote.boundingBox())!.height;
+		assert.ok(Math.abs(wholeHeight - sectionHeight) <= 1,
+			`the nested text window keeps its height on title hover: ${sectionHeight} -> ${wholeHeight}`);
+		await page.screenshot({ path: `${out}/preview-height-title.png` });
+		await part.hover();
+		await innerSection.waitFor();
+		await page.waitForTimeout(500);
+		assert.ok(Math.abs((await innerSection.boundingBox())!.height - wholeHeight) <= 1,
+			'the text window keeps its height when returning to a section');
+		await innerToc.locator('.htoc-toc-item', { hasText: 'Other note' }).hover();
+		await innerSection.getByText('Other intro.', { exact: true }).waitFor();
+		assert.ok(Math.abs((await innerSection.boundingBox())!.height - sectionHeight) <= 1,
+			'sections with different content lengths use the same window height');
+		await moveAway();
+		await page.waitForTimeout(800);
+		assert.equal(await page.locator('.htoc-popup, .hover-popover').count(), 0, 'the height check releases its popup chain');
+		if (scenario === 'preview-height') return;
+	}
+
 	step('T button is shown at the default position (top right)');
 	const button = page.locator('.workspace-leaf.mod-active .htoc-button');
 	await button.waitFor({ timeout: 10000 });
@@ -216,8 +262,8 @@ async function runChecks() {
 	await page.waitForTimeout(300);
 	const titleTocBox = (await toc.boundingBox())!;
 	const titlePreviewBox = (await notePagePreview.boundingBox())!;
-	assert.ok(titlePreviewBox.x + titlePreviewBox.width <= titleTocBox.x - 4,
-		'the title preview opens to the left when the table of contents is at the right edge');
+	assert.ok(Math.abs(titlePreviewBox.x + titlePreviewBox.width - titleTocBox.x) <= 1,
+		'the title preview touches the TOC left edge when there is no room on the right');
 	assert.ok(Math.abs(titlePreviewBox.y - titleTocBox.y) <= 2, 'the title preview aligns with the top of the table of contents');
 	await page.screenshot({ path: `${out}/title-preview.png` });
 
@@ -276,13 +322,13 @@ async function runChecks() {
 	await page.waitForTimeout(500);
 	const leftTocBox = (await toc.boundingBox())!;
 	const rightPreviewBox = (await notePagePreview.boundingBox())!;
-	assert.ok(rightPreviewBox.x >= leftTocBox.x + leftTocBox.width + 4, 'the title preview opens to the right of the entire TOC');
+	assert.ok(Math.abs(rightPreviewBox.x - leftTocBox.x - leftTocBox.width) <= 1, 'the title preview touches the TOC right edge');
 	assert.ok(Math.abs(rightPreviewBox.y - leftTocBox.y) <= 2, 'the right preview aligns with the TOC top');
 	await page.screenshot({ path: `${out}/title-preview-right.png` });
 	await notePagePreview.evaluate((el) => { (el as HTMLElement).style.width = '360px'; });
 	await page.waitForTimeout(400);
 	const resizedPreviewBox = (await notePagePreview.boundingBox())!;
-	assert.ok(resizedPreviewBox.x >= leftTocBox.x + leftTocBox.width + 4, 'a resized native preview stays beside the TOC');
+	assert.ok(Math.abs(resizedPreviewBox.x - leftTocBox.x - leftTocBox.width) <= 1, 'a resized native preview stays beside the TOC');
 	assert.ok(resizedPreviewBox.x + resizedPreviewBox.width <= (await page.evaluate(() => innerWidth)) - 4, 'the resized preview stays inside the window');
 	await page.keyboard.press('Escape');
 	await page.waitForTimeout(500);
@@ -445,9 +491,12 @@ async function runChecks() {
 	step('section previews have the same spacing as Obsidian page previews');
 	const spacing = (popup: string, content: string) => page!.evaluate(({ popup, content }) => {
 		const box = document.querySelector(popup)!.getBoundingClientRect();
-		const blocks = [...document.querySelector(content)!.querySelectorAll('h1, h2, p')];
+		const contentEl = document.querySelector(content)!;
+		const blocks = [...contentEl.querySelectorAll('h1, h2, p')];
 		const first = blocks[0]!.getBoundingClientRect(), last = blocks[blocks.length - 1]!.getBoundingClientRect();
-		return { left: Math.round(first.left - box.left), top: Math.round(first.top - box.top), bottom: Math.round(box.bottom - last.bottom),
+		// Fixed-height windows can have extra space after the padded content.
+		const contentBottom = contentEl.closest('.htoc-popup-content')?.getBoundingClientRect().bottom ?? box.bottom;
+		return { left: Math.round(first.left - box.left), top: Math.round(first.top - box.top), bottom: Math.round(contentBottom - last.bottom),
 			width: Math.round(box.width), fontSize: getComputedStyle(blocks[blocks.length - 1]!).fontSize };
 	}, { popup, content });
 	const native = await spacing('.hover-popover', '.hover-popover .markdown-preview-view');

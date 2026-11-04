@@ -6,6 +6,8 @@ export const CLOSE_DELAY = 300;
 export interface PopupOptions {
 	className: string;
 	placement: Placement;
+	/** Use these horizontal edges while retaining the trigger row’s vertical alignment. */
+	horizontalAnchor?: HTMLElement;
 	/** Fills `popup.contentEl`; may be async (the popup is repositioned once it resolves). */
 	render: (popup: Popup) => void | Promise<void>;
 }
@@ -102,8 +104,11 @@ export class Popup {
 		const doc = this.el.ownerDocument;
 		const win = doc.defaultView;
 		const box = this.el.getBoundingClientRect();
+		const trigger = this.trigger.getBoundingClientRect();
+		const horizontal = this.options.horizontalAnchor?.getBoundingClientRect() ?? trigger;
 		const { left, top } = computePosition(
-			this.trigger.getBoundingClientRect(),
+			{ left: horizontal.left, right: horizontal.right, width: horizontal.width,
+				top: trigger.top, bottom: trigger.bottom, height: trigger.height },
 			{ width: box.width, height: box.height },
 			{ width: win?.innerWidth ?? 0, height: win?.innerHeight ?? 0 },
 			this.options.placement,

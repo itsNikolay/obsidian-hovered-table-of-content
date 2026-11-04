@@ -118,7 +118,8 @@ export class TocController {
 			});
 			this.popups.attach(item, {
 				className: 'htoc-preview',
-				placement: PREVIEW_PLACEMENT,
+				placement: { ...PREVIEW_PLACEMENT, gap: 0 },
+				horizontalAnchor: popup.el,
 				render: (preview) => this.renderPreview(preview, source.path, heading),
 			});
 			list.append(item);
